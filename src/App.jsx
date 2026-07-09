@@ -160,6 +160,57 @@ const menuOptions = baseMenus.flatMap((base, baseIndex) =>
   }))
 );
 
+const educationTopics = [
+  {
+    title: 'Piring seimbang',
+    icon: UtensilsCrossed,
+    text: 'Isi piring dengan karbohidrat kompleks, protein, sayur, buah, dan lemak baik agar energi lebih stabil.',
+    action: 'Target cepat: setengah piring sayur dan buah, lalu lengkapi dengan protein serta sumber karbohidrat.',
+  },
+  {
+    title: 'Protein rendah jejak',
+    icon: Leaf,
+    text: 'Tempe, tahu, kacang merah, edamame, dan telur bisa membantu memenuhi protein tanpa emisi setinggi daging merah.',
+    action: 'Mulai dari 2-3 kali makan berbasis protein nabati per minggu.',
+  },
+  {
+    title: 'Porsi anti mubazir',
+    icon: Recycle,
+    text: 'Mengambil porsi sesuai lapar, membawa kotak makan, dan menghabiskan sisa makanan membantu menekan sampah pangan.',
+    action: 'Pilih porsi kecil dulu, tambah bila masih lapar.',
+  },
+];
+
+const balancedIngredients = [
+  {
+    group: 'Karbohidrat kompleks',
+    items: ['Nasi merah', 'Jagung', 'Ubi', 'Oat', 'Singkong rebus'],
+    note: 'Memberi energi dan serat lebih lama.',
+  },
+  {
+    group: 'Protein seimbang',
+    items: ['Tempe', 'Tahu', 'Kacang merah', 'Edamame', 'Telur'],
+    note: 'Protein nabati lokal membantu menekan jejak karbon.',
+  },
+  {
+    group: 'Sayur dan buah lokal',
+    items: ['Bayam', 'Kangkung', 'Wortel', 'Pepaya', 'Pisang'],
+    note: 'Kaya vitamin, mineral, dan serat harian.',
+  },
+  {
+    group: 'Lemak baik',
+    items: ['Alpukat', 'Kacang tanah', 'Biji wijen', 'Ikan lokal', 'Minyak secukupnya'],
+    note: 'Bantu rasa kenyang tanpa perlu gorengan berlebihan.',
+  },
+];
+
+const carbonSmartTips = [
+  'Ganti sebagian daging merah dengan tempe, tahu, telur, ikan lokal, atau kacang-kacangan.',
+  'Pilih menu rebus, kukus, tumis ringan, atau panggang lebih sering daripada gorengan berat.',
+  'Utamakan bahan musiman dan mudah ditemukan di sekitar kampus.',
+  'Bawa botol minum dan wadah makan untuk mengurangi kemasan sekali pakai.',
+];
+
 function App() {
   const [activePage, setActivePage] = useState('home');
   const [selectedMenu, setSelectedMenu] = useState(menuOptions[0].id);
@@ -239,8 +290,9 @@ function App() {
                   <button type="button" className="primary-btn" onClick={() => setActivePage('ecocalc')}>
                     Lihat EcoCalc
                   </button>
-                  <button type="button" className="secondary-btn" onClick={() => setActivePage('ecocalc')}>
-                    Jelajahi 30 menu
+                  <button type="button" className="secondary-btn" onClick={() => setActivePage('education')}>
+                    <BookOpen size={16} />
+                    Edukasi
                   </button>
                 </div>
               </div>
@@ -323,6 +375,80 @@ function App() {
                     </div>
                     <ArrowRight size={18} />
                   </button>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : activePage === 'education' ? (
+          <>
+            <section className="panel education-hero">
+              <div className="education-hero-copy">
+                <div className="eyebrow">
+                  <BookOpen size={15} />
+                  <span>Edukasi nutrisi</span>
+                </div>
+                <h3>Pilihan makan yang baik untuk tubuh dan bumi.</h3>
+                <p>
+                  Rekomendasi ini membantu memilih bahan bergizi seimbang, mudah ditemukan, dan lebih rendah jejak karbon.
+                </p>
+              </div>
+              <button type="button" className="education-cta" onClick={() => setActivePage('ecocalc')}>
+                <Calculator size={17} />
+                Cek menu
+              </button>
+            </section>
+
+            <section className="education-grid">
+              {educationTopics.map((topic) => {
+                const Icon = topic.icon;
+                return (
+                  <article className="education-card" key={topic.title}>
+                    <div className="education-icon">
+                      <Icon size={18} />
+                    </div>
+                    <h4>{topic.title}</h4>
+                    <p>{topic.text}</p>
+                    <span>{topic.action}</span>
+                  </article>
+                );
+              })}
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading">
+                <h3>Bahan gizi seimbang</h3>
+                <span>Rendah karbon</span>
+              </div>
+              <div className="ingredient-list">
+                {balancedIngredients.map((group) => (
+                  <div className="ingredient-row" key={group.group}>
+                    <div>
+                      <h4>{group.group}</h4>
+                      <p>{group.note}</p>
+                    </div>
+                    <div className="ingredient-chips">
+                      {group.items.map((item) => (
+                        <span className="chip" key={item}>
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel carbon-panel">
+              <div className="panel-heading">
+                <h3>Aksi kurangi jejak karbon</h3>
+                <span>Harian</span>
+              </div>
+              <div className="tip-list">
+                {carbonSmartTips.map((tip, index) => (
+                  <div className="tip-item" key={tip}>
+                    <strong>{index + 1}</strong>
+                    <p>{tip}</p>
+                  </div>
                 ))}
               </div>
             </section>
@@ -427,7 +553,7 @@ function App() {
           <Calculator size={18} />
           <span>EcoCalc</span>
         </button>
-        <button className="nav-item" type="button">
+        <button className={`nav-item ${activePage === 'education' ? 'active' : ''}`} type="button" onClick={() => setActivePage('education')}>
           <GraduationCap size={18} />
           <span>Edukasi</span>
         </button>

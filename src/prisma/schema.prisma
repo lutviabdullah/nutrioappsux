@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  username      String          @unique
+  fullName      String?
+  age           Int?
+  gender        String?
+  heightCm      Int?
+  weightKg      Decimal?        @db.Decimal(5, 2)
+  activityLevel String?
+  dietaryGoal   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  mealLogs      MealLog[]
+  mealPlans     MealPlan[]
+  preferences   UserPreference[]
+}
+
+model FoodCategory {
+  id        String     @id @default(cuid())
+  slug      String     @unique
+  name      String     @unique
+  description String?
+  createdAt DateTime   @default(now())
+  foodItems FoodItem[]
+}
+
+model FoodItem {
+  id              String            @id @default(cuid())
+  slug            String            @unique
+  name            String
+  subtitle        String?
+  emoji           String?
+  categoryId      String?
+  category        FoodCategory?     @relation(fields: [categoryId], references: [id])
+  description     String?
+  basePrice       Decimal           @db.Decimal(10, 2)
+  nutritionScore  Int
+  ecoScore        Int
+  recommendation  String?
+  caloriesKcal    Int?
+  proteinG        Decimal?          @db.Decimal(5, 2)
+  carbsG          Decimal?          @db.Decimal(5, 2)
+  fatG            Decimal?          @db.Decimal(5, 2)
+  fiberG          Decimal?          @db.Decimal(5, 2)
+  sugarG          Decimal?          @db.Decimal(5, 2)
+  sodiumMg        Int?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  ingredients     FoodIngredient[]
+  mealLogs        MealLog[]
+  mealPlanItems   MealPlanItem[]
+  foodNutrients   FoodNutrient[]
+  reviews         FoodReview[]
+}
+
+model Nutrient {
+  id          String         @id @default(cuid())
+  code        String         @unique
+  name        String
+  unit        String
+  description String?
+  createdAt   DateTime       @default(now())
+  foodNutrients FoodNutrient[]
+}
+
+model FoodNutrient {
+  id         String   @id @default(cuid())
+  foodId     String
+  nutrientId String
+  value      Decimal  @db.Decimal(8, 2)
+  createdAt  DateTime @default(now())
+  food       FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  nutrient   Nutrient @relation(fields: [nutrientId], references: [id], onDelete: Cascade)
+
+  @@unique([foodId, nutrientId])
+}
+
+model Ingredient {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  category    String?
+  description String?
+  createdAt   DateTime        @default(now())
+  foodIngredients FoodIngredient[]
+}
+
+model FoodIngredient {
+  id            String      @id @default(cuid())
+  foodId        String
+  ingredientId  String
+  quantityG     Decimal?    @db.Decimal(6, 2)
+  notes         String?
+  food          FoodItem    @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  ingredient    Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@unique([foodId, ingredientId])
+}
+
+model MealLog {
+  id          String   @id @default(cuid())
+  userId      String
+  foodId      String
+  mealType    String
+  portionSize Decimal  @db.Decimal(5, 2)
+  servings    Decimal  @db.Decimal(5, 2) @default(1.00)
+  loggedAt    DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Restrict)
+}
+
+model MealPlan {
+  id          String         @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  createdAt   DateTime       @default(now())
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       MealPlanItem[]
+}
+
+model MealPlanItem {
+  id            String     @id @default(cuid())
+  mealPlanId    String
+  foodId        String
+  dayOfWeek     String?
+  mealType      String?
+  targetServings Decimal    @db.Decimal(5, 2) @default(1.00)
+  mealPlan      MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  food          FoodItem   @relation(fields: [foodId], references: [id], onDelete: Restrict)
+}
+
+model UserPreference {
+  id              String   @id @default(cuid())
+  userId          String
+  preferenceName  String
+  preferenceValue String
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, preferenceName])
+}
+
+model FoodReview {
+  id          String   @id @default(cuid())
+  foodId      String
+  reviewerName String
+  rating      Int
+  comment     String?
+  createdAt   DateTime @default(now())
+  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade)
+}

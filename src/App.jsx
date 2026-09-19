@@ -3,161 +3,290 @@ import {
   Activity,
   ArrowRight,
   BadgeCheck,
+  BarChart3,
   BookOpen,
   Calculator,
+  Check,
+  Droplets,
+  Flame,
   GraduationCap,
   HeartPulse,
   Home,
   Leaf,
   Recycle,
   Sparkles,
+  Target,
+  TrendingUp,
   User,
   UtensilsCrossed,
 } from 'lucide-react';
 import './styles.css';
 
-const baseMenus = [
+const indonesianMenuCatalog = [
   {
-    id: 'burger',
-    name: 'Burger Ramah Bumi',
-    subtitle: 'Roti gandum, sayur panggang, saus rendah gula',
-    price: 24000,
-    nutritionScore: 46,
-    ecoScore: 38,
-    recommendation: 'Cocok untuk momen santai, tapi lebih baik dipadukan dengan salad agar kualitas gizi meningkat.',
-    tone: 'rose',
-    emoji: '🍔',
-    category: 'Fast Food',
-    ecoLabel: 'Cukup Baik',
-  },
-  {
-    id: 'rice-chicken',
-    name: 'Nasi Ayam Kampus',
-    subtitle: 'Nasi putih, ayam goreng, sup sayur',
-    price: 15000,
-    nutritionScore: 62,
-    ecoScore: 55,
-    recommendation: 'Pilihan layak untuk kebutuhan harian. Tambahkan sayur lebih banyak agar skor sustainability naik.',
-    tone: 'amber',
+    id: 'nasi-goreng',
+    name: 'Nasi Goreng Kampung',
+    subtitle: 'Nasi, telur, sayur, bawang, rempah lokal',
     emoji: '🍛',
-    category: 'Kantin',
-    ecoLabel: 'Seimbang',
+    category: 'Harian',
+    basePrice: 15000,
+    nutritionScore: 74,
+    ecoScore: 68,
+    recommendation: 'Menu klasik yang tetap cocok untuk kebutuhan energi harian, terutama saat ditambah sayuran berlimpah.',
   },
   {
-    id: 'gado',
-    name: 'Paket Gado-Gado',
-    subtitle: 'Nasi merah, tahu, tempe, sayur segar',
-    price: 12000,
-    nutritionScore: 91,
-    ecoScore: 89,
-    recommendation: 'Sangat kuat untuk menu harian. Kaya serat, protein nabati, dan sangat ramah lingkungan.',
-    tone: 'emerald',
+    id: 'gado-gado',
+    name: 'Gado-Gado Nusantara',
+    subtitle: 'Sayur segar, tahu, tempe, kacang, sambal',
     emoji: '🥗',
     category: 'Vegan',
-    ecoLabel: 'Ramah Bumi',
+    basePrice: 12000,
+    nutritionScore: 91,
+    ecoScore: 89,
+    recommendation: 'Pilihan paling kuat untuk pola makan seimbang karena kaya serat, protein nabati, dan kandungan sayur.',
   },
   {
-    id: 'soba',
-    name: 'Soba Salmon',
-    subtitle: 'Mie soba, salmon bakar, brokoli',
-    price: 26000,
-    nutritionScore: 74,
-    ecoScore: 62,
-    recommendation: 'Menu ini baik untuk protein dan omega-3, tetapi pilih porsi sedang untuk menjaga jejak karbon.',
-    tone: 'sky',
+    id: 'soto-ayam',
+    name: 'Soto Ayam Sehat',
+    subtitle: 'Kaldu ringan, ayam fillet, wortel, daun seledri',
+    emoji: '🍲',
+    category: 'Tradisional',
+    basePrice: 16500,
+    nutritionScore: 72,
+    ecoScore: 71,
+    recommendation: 'Soto ini ringan dan cocok untuk kebutuhan protein harian jika disajikan dengan porsi sayur lebih besar.',
+  },
+  {
+    id: 'mie-ayam',
+    name: 'Mie Ayam Kampus',
+    subtitle: 'Mie, ayam potong kecil, sawi, pangsit',
     emoji: '🍜',
+    category: 'Kantin',
+    basePrice: 17000,
+    nutritionScore: 68,
+    ecoScore: 62,
+    recommendation: 'Menu familiar dan praktis, tetapi lebih baik dibarengi dengan sayur segar untuk keseimbangan nutrisi.',
+  },
+  {
+    id: 'pecel',
+    name: 'Pecel Sayur',
+    subtitle: 'Lontong, sayur rebus, kacang, sambal',
+    emoji: '🥬',
+    category: 'Sehat',
+    basePrice: 14000,
+    nutritionScore: 85,
+    ecoScore: 80,
+    recommendation: 'Sangat cocok untuk menu siang yang ringan namun kaya serat dan anti lelah.',
+  },
+  {
+    id: 'rendang',
+    name: 'Rendang Padang',
+    subtitle: 'Daging sapi, santan, rempah khas',
+    emoji: '🥘',
     category: 'Protein',
-    ecoLabel: 'Cukup Baik',
+    basePrice: 26000,
+    nutritionScore: 77,
+    ecoScore: 52,
+    recommendation: 'Lezat untuk momen spesial, namun sebaiknya dihadirkan dengan sayur agar keseimbangan lebih optimal.',
+  },
+  {
+    id: 'bakso',
+    name: 'Bakso Sehat',
+    subtitle: 'Bakso sapi, mie, sawi, kuah kaldu',
+    emoji: '🍜',
+    category: 'Kantin',
+    basePrice: 18000,
+    nutritionScore: 70,
+    ecoScore: 64,
+    recommendation: 'Cocok sebagai pemenuhan protein, dan pilih kuah yang lebih bening serta sayur lebih banyak.',
   },
   {
     id: 'tempe-bowl',
     name: 'Tempe Bowl',
-    subtitle: 'Bowl nasi, tempe crispy, sambal hijau',
-    price: 14000,
-    nutritionScore: 84,
-    ecoScore: 82,
-    recommendation: 'Menu ini sangat bagus untuk pola makan berkelanjutan dan mudah dipakai sebagai lunch harian.',
-    tone: 'emerald',
+    subtitle: 'Nasi, tempe crispy, sambal hijau, lalapan',
     emoji: '🥣',
     category: 'Plant Based',
-    ecoLabel: 'Hemat Karbon',
+    basePrice: 14000,
+    nutritionScore: 86,
+    ecoScore: 83,
+    recommendation: 'Pilihan ini sangat bagus untuk gaya hidup berkelanjutan dan pas untuk makan siang rutin.',
   },
   {
-    id: 'soto',
-    name: 'Soto Ayam Sehat',
-    subtitle: 'Kaldu ringan, ayam fillet, wortel',
-    price: 16500,
-    nutritionScore: 69,
-    ecoScore: 61,
-    recommendation: 'Menu ini nyaman untuk tubuh, dan lebih baik jika memakai lebih banyak sayur dan kurang santan.',
-    tone: 'amber',
+    id: 'ayam-geprek',
+    name: 'Ayam Geprek Ceker',
+    subtitle: 'Ayam crispy, sambal, kol, timun',
+    emoji: '🍗',
+    category: 'Fast Food',
+    basePrice: 21000,
+    nutritionScore: 63,
+    ecoScore: 58,
+    recommendation: 'Rasa nikmat dan mengenyangkan, tapi lebih sehat bila dikombinasikan dengan sayur dan porsi wajar.',
+  },
+  {
+    id: 'rawon',
+    name: 'Rawon Suroboyo',
+    subtitle: 'Daging, kuah rempah hitam, daun bawang',
     emoji: '🍲',
-    category: 'Kantin',
-    ecoLabel: 'Seimbang',
-  },
-  {
-    id: 'mie-sayur',
-    name: 'Mie Goreng Sayur',
-    subtitle: 'Mie, kol, wortel, tauge, sedikit minyak',
-    price: 13500,
-    nutritionScore: 58,
-    ecoScore: 66,
-    recommendation: 'Porsi sayur yang padat membantu menyeimbangkan nilai gizi dan emisi makanan.',
-    tone: 'emerald',
-    emoji: '🍝',
-    category: 'Vegetarian',
-    ecoLabel: 'Ramah Bumi',
-  },
-  {
-    id: 'wrap',
-    name: 'Wrap Tahu Italia',
-    subtitle: 'Tortilla gandum, tahu panggang, tomat',
-    price: 17500,
-    nutritionScore: 73,
-    ecoScore: 71,
-    recommendation: 'One-bowl style yang praktis dan lebih efisien untuk mahasiswa yang mobile.',
-    tone: 'sky',
-    emoji: '🌯',
-    category: 'Snack',
-    ecoLabel: 'Cukup Baik',
-  },
-  {
-    id: 'salad',
-    name: 'Salad Quinoa',
-    subtitle: 'Quinoa, kacang, paprika, dressing lemon',
-    price: 22000,
-    nutritionScore: 88,
-    ecoScore: 78,
-    recommendation: 'Pilih ini untuk kebutuhan energi dan nutrisi yang lebih stabil dalam sehari.',
-    tone: 'emerald',
-    emoji: '🥬',
-    category: 'Wellness',
-    ecoLabel: 'Hemat Karbon',
-  },
-  {
-    id: 'nasi-uduk',
-    name: 'Nasi Uduk Nabati',
-    subtitle: 'Nasi uduk, tahu, tempe, sambal',
-    price: 13000,
-    nutritionScore: 68,
-    ecoScore: 74,
-    recommendation: 'Menu ini menjaga rasa familiar tetapi lebih baik jika dikurangi minyak dan ditambah sayur.',
-    tone: 'amber',
-    emoji: '🍚',
     category: 'Tradisional',
-    ecoLabel: 'Seimbang',
+    basePrice: 22000,
+    nutritionScore: 75,
+    ecoScore: 59,
+    recommendation: 'Menu ini kaya rasa dan protein, tetapi sebaiknya dipadukan dengan tambahan sayur hijau.',
+  },
+  {
+    id: 'pempek',
+    name: 'Pempek Palembang',
+    subtitle: 'Ikan giling, mie, cuko, sayur mentimun',
+    emoji: '🐟',
+    category: 'Seafood',
+    basePrice: 19000,
+    nutritionScore: 79,
+    ecoScore: 73,
+    recommendation: 'Sumber protein yang baik untuk variasi harian jika dikonsumsi dengan porsi yang seimbang.',
+  },
+  {
+    id: 'lontong-sayur',
+    name: 'Lontong Sayur',
+    subtitle: 'Lontong, sayur santan, tahu, tempe',
+    emoji: '🥥',
+    category: 'Tradisional',
+    basePrice: 13000,
+    nutritionScore: 82,
+    ecoScore: 81,
+    recommendation: 'Menu ini sangat ramah kantong dan juga kaya serat, terutama saat sayuran hadir lebih dominan.',
+  },
+  {
+    id: 'sate-ayam',
+    name: 'Sate Ayam Madura',
+    subtitle: 'Ayam, lontong, bumbu kacang, timun',
+    emoji: '🍢',
+    category: 'Protein',
+    basePrice: 20000,
+    nutritionScore: 81,
+    ecoScore: 69,
+    recommendation: 'Sate bisa menjadi pilihan tinggi protein, namun lebih baik untuk takaran porsi yang moderat.',
+  },
+  {
+    id: 'es-teh',
+    name: 'Es Teh Segar',
+    subtitle: 'Teh, lemon, irisan mentimun, es batu',
+    emoji: '🧊',
+    category: 'Minuman',
+    basePrice: 7000,
+    nutritionScore: 55,
+    ecoScore: 88,
+    recommendation: 'Minuman segar yang cocok untuk menjaga hidrasi, terutama ketika tidak terlalu manis.',
+  },
+  {
+    id: 'rujak',
+    name: 'Rujak Buah',
+    subtitle: 'Buah segar, kacang, bumbu petis',
+    emoji: '🍇',
+    category: 'Buah',
+    basePrice: 12000,
+    nutritionScore: 83,
+    ecoScore: 87,
+    recommendation: 'Pilihan yang sangat baik untuk serat dan vitamin sekaligus tetap menyegarkan saat siang hari.',
+  },
+  {
+    id: 'tumis-kangkung',
+    name: 'Tumis Kangkung',
+    subtitle: 'Kangkung, bawang putih, cabai, sedikit minyak',
+    emoji: '🥬',
+    category: 'Sayur',
+    basePrice: 11000,
+    nutritionScore: 88,
+    ecoScore: 92,
+    recommendation: 'Sangat cocok sebagai pendamping menu utama untuk meningkatkan asupan sayur dan menurunkan jejak karbon.',
+  },
+  {
+    id: 'mie-rebus',
+    name: 'Mie Rebus Betawi',
+    subtitle: 'Mie, sayur, telur, kuah rempah',
+    emoji: '🍜',
+    category: 'Tradisional',
+    basePrice: 16000,
+    nutritionScore: 76,
+    ecoScore: 70,
+    recommendation: 'Menu ini tepat untuk kebutuhan kenyang tanpa overload kalori bila porsi sayur ditambah.',
+  },
+  {
+    id: 'ikan-bakar',
+    name: 'Ikan Bakar Segar',
+    subtitle: 'Ikan nila, sambal, kemangi, jeruk nipis',
+    emoji: '🐠',
+    category: 'Seafood',
+    basePrice: 24000,
+    nutritionScore: 89,
+    ecoScore: 76,
+    recommendation: 'Pilihan sehat, kaya protein, dan sangat cocok untuk pola makan sehat yang tetap lezat.',
+  },
+  {
+    id: 'nasi-padang',
+    name: 'Nasi Padang',
+    subtitle: 'Nasi, rendang, sayur, sambal hijau',
+    emoji: '🍚',
+    category: 'Combo',
+    basePrice: 24000,
+    nutritionScore: 80,
+    ecoScore: 65,
+    recommendation: 'Menu lengkap dan kaya rasa, tetapi pilih porsi sayur dan protein nabati untuk keseimbangan lebih baik.',
+  },
+  {
+    id: 'sayur-asem',
+    name: 'Sayur Asem Komplit',
+    subtitle: 'Asem jawa, sayur, tahu, tempe, daun melinjo',
+    emoji: '🥦',
+    category: 'Sayur',
+    basePrice: 13000,
+    nutritionScore: 87,
+    ecoScore: 90,
+    recommendation: 'Menu yang sangat baik untuk asupan serat dan rasa segar tanpa perlu banyak tambahan lemak.',
+  },
+  {
+    id: 'capcay',
+    name: 'Capcay Organik',
+    subtitle: 'Sayur, jamur, wortel, brokoli, udang',
+    emoji: '🥦',
+    category: 'Hidangan',
+    basePrice: 19000,
+    nutritionScore: 87,
+    ecoScore: 82,
+    recommendation: 'Menu ini memadukan berbagai jenis sayur dan protein ringan untuk kebutuhan harian yang seimbang.',
   },
 ];
 
-const menuOptions = baseMenus.flatMap((base, baseIndex) =>
-  ['Classic', 'Campus', 'Eco'].map((variant, variantIndex) => ({
-    ...base,
-    id: `${base.id}-${variantIndex + 1}`,
-    name: `${base.name} ${variant}`,
-    subtitle: `${base.subtitle} • ${['Porsi Ringan', 'Porsi Standar', 'Porsi Hemat'][variantIndex]}`,
-    price: Number(base.price) + variantIndex * 2000,
-    recommendation: `${base.recommendation} ${variantIndex === 2 ? 'Versi ini paling direkomendasikan untuk gaya hidup berkelanjutan.' : ''}`,
-  }))
+const menuVariants = ['Classic', 'Campus', 'Sehat', 'Protein', 'Bumi', 'Rasa Lokal', 'Hemat', 'Green', 'Family', 'Chef Pick'];
+
+const menuOptions = indonesianMenuCatalog.flatMap((base, menuIndex) =>
+  Array.from({ length: 10 }, (_, variantIndex) => {
+    const nutrientBoost = (variantIndex % 3) * 3 + (menuIndex % 2 === 0 ? 1 : 0);
+    const ecoBoost = (variantIndex + menuIndex) % 4 === 0 ? 3 : (variantIndex % 2 === 0 ? 2 : 1);
+    const variantName = menuVariants[variantIndex];
+    const packageNames = [
+      'Porsi Ringan',
+      'Porsi Standar',
+      'Porsi Protein',
+      'Porsi Hijau',
+      'Porsi Hemat',
+      'Porsi Keluarga',
+      'Porsi Energi',
+      'Porsi Rendah Garam',
+      'Porsi Seimbang',
+      'Porsi Lokal',
+    ];
+
+    return {
+      ...base,
+      id: `${base.id}-${variantIndex + 1}`,
+      name: `${base.name} ${variantName}`,
+      subtitle: `${base.subtitle} • ${packageNames[variantIndex]}`,
+      price: base.basePrice + variantIndex * 1800 + (menuIndex % 5) * 700,
+      nutritionScore: Math.min(98, base.nutritionScore + nutrientBoost),
+      ecoScore: Math.min(96, base.ecoScore + ecoBoost),
+      recommendation: `${base.recommendation} Versi ${variantName} sangat sesuai dipakai untuk pola makan modern yang tetap peduli pada lingkungan.`,
+    };
+  })
 );
 
 const educationTopics = [
@@ -211,10 +340,78 @@ const carbonSmartTips = [
   'Bawa botol minum dan wadah makan untuk mengurangi kemasan sekali pakai.',
 ];
 
+const rangeLabels = {
+  minggu: 'Minggu',
+  bulan: 'Bulan',
+  triwulan: '3 bulan',
+};
+
+const profileMetrics = {
+  minggu: [
+    { label: 'Kalori', value: 1920, unit: ' kcal', tone: 'amber', icon: Flame },
+    { label: 'Air', value: 2.1, unit: ' L', tone: 'blue', icon: Droplets },
+    { label: 'Protein', value: 78, unit: '%', tone: 'green', icon: Target },
+  ],
+  bulan: [
+    { label: 'Kalori', value: 5780, unit: ' kcal', tone: 'amber', icon: Flame },
+    { label: 'Air', value: 61, unit: ' L', tone: 'blue', icon: Droplets },
+    { label: 'Protein', value: 84, unit: '%', tone: 'green', icon: Target },
+  ],
+  triwulan: [
+    { label: 'Kalori', value: 17340, unit: ' kcal', tone: 'amber', icon: Flame },
+    { label: 'Air', value: 192, unit: ' L', tone: 'blue', icon: Droplets },
+    { label: 'Protein', value: 89, unit: '%', tone: 'green', icon: Target },
+  ],
+};
+
+const mealTrendData = {
+  minggu: [
+    { label: 'Sen', value: 72 },
+    { label: 'Sel', value: 84 },
+    { label: 'Rab', value: 68 },
+    { label: 'Kam', value: 91 },
+    { label: 'Jum', value: 86 },
+    { label: 'Sab', value: 62 },
+    { label: 'Min', value: 76 },
+  ],
+  bulan: [
+    { label: '1', value: 58 },
+    { label: '5', value: 67 },
+    { label: '10', value: 74 },
+    { label: '15', value: 82 },
+    { label: '20', value: 89 },
+    { label: '25', value: 85 },
+    { label: '30', value: 92 },
+  ],
+  triwulan: [
+    { label: 'Jan', value: 60 },
+    { label: 'Feb', value: 73 },
+    { label: 'Mar', value: 82 },
+    { label: 'Apr', value: 88 },
+    { label: 'Mei', value: 91 },
+    { label: 'Jun', value: 94 },
+  ],
+};
+
+const profileFocus = [
+  { label: 'Serat', value: 82, unit: '%', tone: 'green' },
+  { label: 'Hydration', value: 91, unit: '%', tone: 'blue' },
+  { label: 'Keseimbangan', value: 76, unit: '%', tone: 'amber' },
+];
+
+const initialProfileHabits = [
+  { id: 'air', label: 'Minum 2L air', done: true },
+  { id: 'protein', label: 'Penuhi protein nabati', done: true },
+  { id: 'sayur', label: 'Tambahkan sayur hijau', done: false },
+  { id: 'porsi', label: 'Ambil porsi sesuai kebutuhan', done: true },
+];
+
 function App() {
   const [activePage, setActivePage] = useState('home');
   const [selectedMenu, setSelectedMenu] = useState(menuOptions[0].id);
   const [activeInsight, setActiveInsight] = useState('nutrition');
+  const [selectedPeriod, setSelectedPeriod] = useState('minggu');
+  const [profileHabits, setProfileHabits] = useState(initialProfileHabits);
 
   const selected = useMemo(
     () => menuOptions.find((item) => item.id === selectedMenu) ?? menuOptions[0],
@@ -258,18 +455,26 @@ function App() {
 
   const activeInsightData = insightData[activeInsight];
 
+  const toggleHabit = (habitId) => {
+    setProfileHabits((current) =>
+      current.map((habit) =>
+        habit.id === habitId ? { ...habit, done: !habit.done } : habit
+      )
+    );
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <div>
-          <h1>EcoNutri</h1>
-          <p>Nutrition Education for Campus Life</p>
+          <h1>Nutrio</h1>
+          <p>Nutrisi Indonesia untuk gaya hidup modern</p>
         </div>
         <div className="topbar-actions">
           <div className="topbar-icon">
             <Leaf size={20} />
           </div>
-          <div className="pill">Live eco score</div>
+          <div className="pill">Skor nutrisi</div>
         </div>
       </header>
 
@@ -280,7 +485,7 @@ function App() {
               <div className="hero-copy">
                 <div className="eyebrow">
                   <Sparkles size={15} />
-                  <span>Eco habit tracker</span>
+                  <span>Pelacak kebiasaan ramah lingkungan</span>
                 </div>
                 <h2>Pilih makan siangmu, lihat dampakmu pada bumi.</h2>
                 <p>
@@ -311,7 +516,7 @@ function App() {
               <div className="insight-header">
                 <div>
                   <p className="eyebrow">Data interaktif</p>
-                  <h3>Live insight untuk pilihanmu</h3>
+                  <h3>Insight live untuk pilihanmu</h3>
                 </div>
                 <span className="pill">{selected.name}</span>
               </div>
@@ -453,6 +658,134 @@ function App() {
               </div>
             </section>
           </>
+        ) : activePage === 'profile' ? (
+          <>
+            <section className="panel profile-hero">
+              <div className="profile-header">
+                <div className="profile-avatar" aria-hidden="true">
+                  <User size={24} />
+                </div>
+                <div className="profile-copy">
+                  <div className="eyebrow">Mahasiswa sehat</div>
+                  <h3>Alya Pradana</h3>
+                  <p>Teknik Informatika • Semester 6</p>
+                </div>
+                <button type="button" className="secondary-btn small-btn">
+                  Edit profil
+                </button>
+              </div>
+
+              <div className="profile-summary">
+                <div>
+                  <span>Streak aktif</span>
+                  <strong>12 hari</strong>
+                </div>
+                <div>
+                  <span>Target sehat</span>
+                  <strong>82%</strong>
+                </div>
+                <div>
+                  <span>Energi</span>
+                  <strong>89%</strong>
+                </div>
+              </div>
+
+              <div className="profile-focus-grid">
+                {profileFocus.map(({ label, value, unit, tone }) => (
+                  <div key={label} className={`focus-card ${tone}`}>
+                    <div className="focus-header">
+                      <span>{label}</span>
+                      <strong>
+                        {value}
+                        {unit}
+                      </strong>
+                    </div>
+                    <div className="focus-progress">
+                      <span style={{ width: `${value}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="insight-dashboard">
+              <div className="insight-header">
+                <div>
+                  <p className="eyebrow">Ringkasan harian</p>
+                  <h3>Performa nutrisi</h3>
+                </div>
+                <div className="segmented">
+                  {Object.keys(profileMetrics).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      className={selectedPeriod === range ? 'segment active' : 'segment'}
+                      onClick={() => setSelectedPeriod(range)}
+                    >
+                      {rangeLabels[range]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="profile-metric-grid">
+                {profileMetrics[selectedPeriod].map(({ label, value, unit, tone, icon: Icon }) => (
+                  <div key={label} className={`profile-metric ${tone}`}>
+                    <div className="metric-icon-wrap">
+                      <Icon size={16} />
+                    </div>
+                    <div>
+                      <span>{label}</span>
+                      <strong>
+                        {value}
+                        {unit}
+                      </strong>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel chart-panel">
+              <div className="panel-heading">
+                <h3>Trend pola makan</h3>
+                <span>{rangeLabels[selectedPeriod]}</span>
+              </div>
+              <div className="chart-bars">
+                {mealTrendData[selectedPeriod].map((item) => (
+                  <div className="chart-col" key={item.label}>
+                    <div className="chart-bar-container">
+                      <div className="chart-bar" style={{ height: `${item.value}%` }} />
+                    </div>
+                    <span>{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel checklist-panel">
+              <div className="panel-heading">
+                <h3>Checklist kebiasaan</h3>
+                <span>
+                  {profileHabits.filter((habit) => habit.done).length}/{profileHabits.length}
+                </span>
+              </div>
+
+              <div className="habit-list">
+                {profileHabits.map((habit) => (
+                  <button
+                    key={habit.id}
+                    type="button"
+                    className={`habit-item ${habit.done ? 'done' : ''}`}
+                    onClick={() => toggleHabit(habit.id)}
+                  >
+                    <span className="habit-checkmark">{habit.done ? <Check size={12} /> : ''}</span>
+                    <span>{habit.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </>
         ) : (
           <>
             <section className="panel eco-panel">
@@ -460,7 +793,7 @@ function App() {
                 <div>
                   <div className="eyebrow">
                     <Calculator size={15} />
-                    <span>EcoCalc • 30 variasi menu</span>
+                    <span>NutriCalc • 200 variasi menu</span>
                   </div>
                   <h3>Pilih menu favoritmu</h3>
                   <p>Setiap item menampilkan analisis eco-nutrisi secara cepat dan interaktif.</p>
@@ -551,13 +884,13 @@ function App() {
         </button>
         <button className={`nav-item ${activePage === 'ecocalc' ? 'active' : ''}`} type="button" onClick={() => setActivePage('ecocalc')}>
           <Calculator size={18} />
-          <span>EcoCalc</span>
+          <span>NutriCalc</span>
         </button>
         <button className={`nav-item ${activePage === 'education' ? 'active' : ''}`} type="button" onClick={() => setActivePage('education')}>
           <GraduationCap size={18} />
           <span>Edukasi</span>
         </button>
-        <button className="nav-item" type="button">
+        <button className={`nav-item ${activePage === 'profile' ? 'active' : ''}`} type="button" onClick={() => setActivePage('profile')}>
           <User size={18} />
           <span>Profil</span>
         </button>

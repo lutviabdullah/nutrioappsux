@@ -444,6 +444,57 @@ input {
   border-color: #f59e0b;
 }
 
+.menu-groups-scroll {
+  max-height: 560px;
+  overflow-y: auto;
+  padding: 0.1rem 0.45rem 0.4rem 0.1rem;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 transparent;
+}
+
+.menu-group + .menu-group {
+  margin-top: 1.25rem;
+}
+
+.menu-group-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+  padding: 0 0.15rem;
+}
+
+.menu-group-heading h4 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.menu-group-heading p {
+  margin: 0.15rem 0 0;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.menu-group-range {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.menu-group.low .menu-group-heading h4 {
+  color: #047857;
+}
+
+.menu-group.medium .menu-group-heading h4 {
+  color: #b45309;
+}
+
+.menu-group.high .menu-group-heading h4 {
+  color: #be123c;
+}
+
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1132,6 +1183,16 @@ input {
 
   .menu-grid {
     grid-template-columns: 1fr;
+  }
+
+  .menu-groups-scroll {
+    max-height: 520px;
+  }
+
+  .menu-group-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
   }
 
   .analysis-summary {

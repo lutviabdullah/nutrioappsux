@@ -289,6 +289,33 @@ const menuOptions = indonesianMenuCatalog.flatMap((base, menuIndex) =>
   })
 );
 
+const carbonMenuGroups = [
+  {
+    key: 'low',
+    title: 'Jejak karbon rendah',
+    description: 'Pilihan paling ramah lingkungan',
+    range: 'Eco score 80+',
+    tone: 'low',
+    items: menuOptions.filter((menu) => menu.ecoScore >= 80),
+  },
+  {
+    key: 'medium',
+    title: 'Jejak karbon sedang',
+    description: 'Pilihan seimbang untuk sehari-hari',
+    range: 'Eco score 65–79',
+    tone: 'medium',
+    items: menuOptions.filter((menu) => menu.ecoScore >= 65 && menu.ecoScore < 80),
+  },
+  {
+    key: 'high',
+    title: 'Jejak karbon tinggi',
+    description: 'Nikmati lebih jarang dan imbangi dengan menu hijau',
+    range: 'Eco score di bawah 65',
+    tone: 'high',
+    items: menuOptions.filter((menu) => menu.ecoScore < 65),
+  },
+];
+
 const educationTopics = [
   {
     title: 'Piring seimbang',
@@ -804,25 +831,39 @@ function App() {
                 </div>
               </div>
 
-              <div className="menu-grid">
-                {menuOptions.map((menu) => (
-                  <button
-                    key={menu.id}
-                    type="button"
-                    className={`menu-card ${selectedMenu === menu.id ? 'selected' : ''}`}
-                    onClick={() => setSelectedMenu(menu.id)}
-                  >
-                    <div className="menu-card-top">
-                      <span className="emoji">{menu.emoji}</span>
-                      <span className="menu-price">Rp{menu.price.toLocaleString('id-ID')}</span>
+              <div className="menu-groups-scroll">
+                {carbonMenuGroups.map((group) => (
+                  <section className={`menu-group ${group.tone}`} key={group.key}>
+                    <div className="menu-group-heading">
+                      <div>
+                        <h4>{group.title}</h4>
+                        <p>{group.description}</p>
+                      </div>
+                      <span className="menu-group-range">{group.range} · {group.items.length} menu</span>
                     </div>
-                    <h4>{menu.name}</h4>
-                    <p>{menu.subtitle}</p>
-                    <div className="chip-row">
-                      <span className="chip">{menu.category}</span>
-                      <span className="chip">{menu.ecoLabel}</span>
+
+                    <div className="menu-grid">
+                      {group.items.map((menu) => (
+                        <button
+                          key={menu.id}
+                          type="button"
+                          className={`menu-card ${selectedMenu === menu.id ? 'selected' : ''}`}
+                          onClick={() => setSelectedMenu(menu.id)}
+                        >
+                          <div className="menu-card-top">
+                            <span className="emoji">{menu.emoji}</span>
+                            <span className="menu-price">Rp{menu.price.toLocaleString('id-ID')}</span>
+                          </div>
+                          <h4>{menu.name}</h4>
+                          <p>{menu.subtitle}</p>
+                          <div className="chip-row">
+                            <span className="chip">{menu.category}</span>
+                            <span className="chip">{menu.ecoLabel}</span>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-                  </button>
+                  </section>
                 ))}
               </div>
             </section>

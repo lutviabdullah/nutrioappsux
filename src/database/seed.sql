@@ -1,3 +1,5 @@
+BEGIN;
+
 INSERT INTO food_categories (id, slug, name, description) VALUES
   ('cat_daily', 'harian', 'Harian', 'Menu sehat untuk kebutuhan energi harian.'),
   ('cat_vegan', 'vegan', 'Vegan', 'Pilihan berbasis plant-based dan tinggi serat.'),
@@ -29,3 +31,5 @@ INSERT INTO nutrients (id, code, name, unit, description) VALUES
   ('nut_sugar', 'SUGAR', 'Sugar', 'g', 'Total sugar amount.'),
   ('nut_sodium', 'SODIUM', 'Sodium', 'mg', 'Sodium level in milligrams.')
 ON CONFLICT (code) DO NOTHING;
+
+COMMIT;

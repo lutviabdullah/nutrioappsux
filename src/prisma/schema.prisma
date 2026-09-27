@@ -13,17 +13,20 @@ model User {
   username      String          @unique
   fullName      String?         @map("full_name")
   age           Int?
-  gender        String?
+  gender        String?         @db.VarChar(30)
   heightCm      Int?            @map("height_cm")
   weightKg      Decimal?        @map("weight_kg") @db.Decimal(5, 2)
-  activityLevel String?         @map("activity_level")
-  dietaryGoal   String?         @map("dietary_goal")
+  activityLevel String?         @map("activity_level") @db.VarChar(40)
+  dietaryGoal   String?         @map("dietary_goal") @db.VarChar(40)
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
   mealLogs      MealLog[]
   mealPlans     MealPlan[]
   preferences   UserPreference[]
   nutritionLedgerEntries NutritionLedgerEntry[]
+  genderOption  GenderOption?   @relation(fields: [gender], references: [code], onDelete: SetNull, map: "fk_users_gender")
+  activityOption ActivityLevel? @relation(fields: [activityLevel], references: [code], onDelete: SetNull, map: "fk_users_activity_level")
+  dietaryGoalOption DietaryGoal? @relation(fields: [dietaryGoal], references: [code], onDelete: SetNull, map: "fk_users_dietary_goal")
 
   @@map("users")
 }
@@ -52,13 +55,6 @@ model FoodItem {
   nutritionScore  Int               @map("nutrition_score") @db.SmallInt
   ecoScore        Int               @map("eco_score") @db.SmallInt
   recommendation  String?
-  caloriesKcal    Int?              @map("calories_kcal")
-  proteinG        Decimal?          @map("protein_g") @db.Decimal(5, 2)
-  carbsG          Decimal?          @map("carbs_g") @db.Decimal(5, 2)
-  fatG            Decimal?          @map("fat_g") @db.Decimal(5, 2)
-  fiberG          Decimal?          @map("fiber_g") @db.Decimal(5, 2)
-  sugarG          Decimal?          @map("sugar_g") @db.Decimal(5, 2)
-  sodiumMg        Int?              @map("sodium_mg")
   isActive        Boolean           @default(true) @map("is_active")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
@@ -104,10 +100,11 @@ model FoodNutrient {
 model Ingredient {
   id          String          @id @default(cuid())
   name        String          @unique
-  category    String?
+  categoryId  String?         @map("category_id") @db.Uuid
   description String?
   createdAt   DateTime        @default(now()) @map("created_at")
   foodIngredients FoodIngredient[]
+  category    IngredientCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull, map: "fk_ingredients_category")
 
   @@map("ingredients")
 }
@@ -138,6 +135,7 @@ model MealLog {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_meal_logs_user")
   food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Restrict, map: "fk_meal_logs_food")
   ledgerEntry NutritionLedgerEntry?
+  type        MealType @relation(fields: [mealType], references: [code], onDelete: Restrict, map: "fk_meal_logs_type")
 
   @@index([userId, loggedAt(sort: Desc)], map: "idx_meal_logs_user_time")
   @@index([userId, foodId, loggedAt(sort: Desc)], map: "idx_meal_logs_user_food_time")
@@ -168,6 +166,7 @@ model MealPlanItem {
   targetServings Decimal    @default(1.00) @map("target_servings") @db.Decimal(5, 2)
   mealPlan      MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade, map: "fk_meal_plan_items_meal_plan")
   food          FoodItem   @relation(fields: [foodId], references: [id], onDelete: Restrict, map: "fk_meal_plan_items_food")
+  type           MealType?  @relation(fields: [mealType], references: [code], onDelete: Restrict, map: "fk_meal_plan_items_type")
 
   @@index([mealPlanId, dayOfWeek], map: "idx_meal_plan_items_plan_day")
   @@index([foodId, mealPlanId], map: "idx_meal_plan_items_food")
@@ -233,4 +232,84 @@ model NutritionLedgerEntry {
 
   @@index([userId, occurredAt(sort: Desc), id(sort: Desc)], map: "idx_ledger_user_time")
   @@map("nutrition_ledger_entries")
+}
+
+model GenderOption {
+  code  String  @id @db.VarChar(30)
+  label String
+  users User[]
+
+  @@map("gender_options")
+}
+
+model ActivityLevel {
+  code  String  @id @db.VarChar(40)
+  label String
+  users User[]
+
+  @@map("activity_levels")
+}
+
+model DietaryGoal {
+  code  String  @id @db.VarChar(40)
+  label String
+  users User[]
+
+  @@map("dietary_goals")
+}
+
+model MealType {
+  code          String          @id @db.VarChar(40)
+  label         String
+  mealLogs      MealLog[]
+  planItems     MealPlanItem[]
+
+  @@map("meal_types")
+}
+
+model IngredientCategory {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String       @unique @db.VarChar(80)
+  ingredients Ingredient[]
+
+  @@map("ingredient_categories")
+}
+
+model EducationCategory {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug       String      @unique @db.VarChar(80)
+  name       String      @unique @db.VarChar(80)
+  education  Education[]
+
+  @@map("education_categories")
+}
+
+model Education {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug        String           @unique
+  title       String           @db.VarChar(120)
+  categoryId  String           @map("category_id") @db.Uuid
+  summary     String
+  action      String           @default("")
+  icon        String           @default("book-open") @db.VarChar(40)
+  sortOrder   Int              @default(0) @map("sort_order") @db.SmallInt
+  isPublished Boolean          @default(true) @map("is_published")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  category    EducationCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([sortOrder, title], map: "idx_education_published_order")
+  @@map("education")
+}
+
+model Profile {
+  userId     String   @id @map("user_id") @db.Uuid
+  fullName   String   @default("Nutrio User") @map("full_name")
+  university String   @default("")
+  faculty    String   @default("")
+  semester   Int?     @db.SmallInt
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("profiles")
 }

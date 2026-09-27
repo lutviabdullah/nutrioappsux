@@ -129,24 +129,33 @@ async function getMenuFromDb() {
 
   try {
     const items = await prisma.foodItem.findMany({
-      include: { category: true },
+      include: {
+        category: true,
+        foodNutrients: { include: { nutrient: true } },
+      },
       orderBy: { nutritionScore: 'desc' },
     });
 
-    return items.map((item) => normalizeMenuItem({
-      id: item.id,
-      name: item.name,
-      subtitle: item.subtitle,
-      emoji: item.emoji,
-      category: item.category?.name || 'General',
-      basePrice: Number(item.basePrice),
-      nutritionScore: Number(item.nutritionScore),
-      ecoScore: Number(item.ecoScore),
-      recommendation: item.recommendation,
-      caloriesKcal: item.caloriesKcal || 400,
-      proteinG: Number(item.proteinG || 18),
-      fiberG: Number(item.fiberG || 5),
-    }));
+    return items.map((item) => {
+      const nutrients = Object.fromEntries(
+        item.foodNutrients.map(({ nutrient, value }) => [nutrient.code, Number(value)])
+      );
+
+      return normalizeMenuItem({
+        id: item.id,
+        name: item.name,
+        subtitle: item.subtitle,
+        emoji: item.emoji,
+        category: item.category?.name || 'General',
+        basePrice: Number(item.basePrice),
+        nutritionScore: Number(item.nutritionScore),
+        ecoScore: Number(item.ecoScore),
+        recommendation: item.recommendation,
+        caloriesKcal: nutrients.CAL ?? 400,
+        proteinG: nutrients.PROTEIN ?? 18,
+        fiberG: nutrients.FIBER ?? 5,
+      });
+    });
   } catch (error) {
     console.warn('Falling back to in-memory data:', error.message);
     return fallbackMenu;
@@ -261,17 +270,20 @@ app.post('/api/meals/log', async (req, res) => {
 
   if (process.env.DATABASE_URL) {
     try {
-      const primaryUser = await prisma.user.findUnique({ where: { email: session.user.email } });
-      if (primaryUser) {
-        await prisma.mealLog.create({
-          data: {
-            userId: primaryUser.id,
-            foodId: food.id,
-            mealType,
-            portionSize: Number(servings || 1),
-            servings: Number(servings || 1),
-          },
-        });
+      const [ledgerEntry] = await prisma.$queryRaw`
+        SELECT meal_id, calories_kcal, protein_g, fiber_g
+        FROM log_meal_with_ledger(
+          ${session.user.id},
+          ${food.id},
+          ${mealType},
+          ${Number(servings || 1)}
+        )
+      `;
+
+      if (ledgerEntry) {
+        result.id = ledgerEntry.meal_id;
+        result.calories = Math.round(Number(ledgerEntry.calories_kcal));
+        result.protein = Math.round(Number(ledgerEntry.protein_g));
       }
     } catch (error) {
       console.warn('Meal logging DB fallback activated:', error.message);

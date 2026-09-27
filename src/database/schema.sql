@@ -12,6 +12,37 @@ CREATE TABLE IF NOT EXISTS audit_events (
   occurred_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
+CREATE TABLE IF NOT EXISTS gender_options (
+  code VARCHAR(30) PRIMARY KEY,
+  label VARCHAR(80) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS activity_levels (
+  code VARCHAR(40) PRIMARY KEY,
+  label VARCHAR(80) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS dietary_goals (
+  code VARCHAR(40) PRIMARY KEY,
+  label VARCHAR(80) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS meal_types (
+  code VARCHAR(40) PRIMARY KEY,
+  label VARCHAR(80) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ingredient_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(80) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS education_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug VARCHAR(80) NOT NULL UNIQUE,
+  name VARCHAR(80) NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
@@ -25,6 +56,9 @@ CREATE TABLE IF NOT EXISTS users (
   dietary_goal VARCHAR(40),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_users_gender FOREIGN KEY (gender) REFERENCES gender_options(code) ON DELETE SET NULL,
+  CONSTRAINT fk_users_activity_level FOREIGN KEY (activity_level) REFERENCES activity_levels(code) ON DELETE SET NULL,
+  CONSTRAINT fk_users_dietary_goal FOREIGN KEY (dietary_goal) REFERENCES dietary_goals(code) ON DELETE SET NULL,
   CONSTRAINT ck_users_age CHECK (age IS NULL OR age BETWEEN 13 AND 130),
   CONSTRAINT ck_users_height CHECK (height_cm IS NULL OR height_cm BETWEEN 50 AND 275),
   CONSTRAINT ck_users_weight CHECK (weight_kg IS NULL OR weight_kg BETWEEN 2 AND 700)
@@ -50,26 +84,10 @@ CREATE TABLE IF NOT EXISTS food_items (
   nutrition_score SMALLINT NOT NULL CHECK (nutrition_score BETWEEN 0 AND 100),
   eco_score SMALLINT NOT NULL CHECK (eco_score BETWEEN 0 AND 100),
   recommendation TEXT,
-  calories_kcal INTEGER,
-  protein_g DECIMAL(5, 2),
-  carbs_g DECIMAL(5, 2),
-  fat_g DECIMAL(5, 2),
-  fiber_g DECIMAL(5, 2),
-  sugar_g DECIMAL(5, 2),
-  sodium_mg INTEGER,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT ck_food_items_price CHECK (base_price >= 0),
-  CONSTRAINT ck_food_items_nutrition_values CHECK (
-    (calories_kcal IS NULL OR calories_kcal >= 0) AND
-    (protein_g IS NULL OR protein_g >= 0) AND
-    (carbs_g IS NULL OR carbs_g >= 0) AND
-    (fat_g IS NULL OR fat_g >= 0) AND
-    (fiber_g IS NULL OR fiber_g >= 0) AND
-    (sugar_g IS NULL OR sugar_g >= 0) AND
-    (sodium_mg IS NULL OR sodium_mg >= 0)
-  ),
   CONSTRAINT fk_food_items_category
     FOREIGN KEY (category_id)
     REFERENCES food_categories(id)
@@ -86,7 +104,7 @@ CREATE TABLE IF NOT EXISTS nutrients (
 );
 
 CREATE TABLE IF NOT EXISTS food_nutrients (
-  id TEXT PRIMARY KEY,
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
   food_id TEXT NOT NULL,
   nutrient_id TEXT NOT NULL,
   value DECIMAL(8, 2) NOT NULL,
@@ -106,9 +124,11 @@ CREATE TABLE IF NOT EXISTS food_nutrients (
 CREATE TABLE IF NOT EXISTS ingredients (
   id TEXT PRIMARY KEY,
   name VARCHAR(120) NOT NULL UNIQUE,
-  category VARCHAR(80),
+  category_id UUID,
   description TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_ingredients_category FOREIGN KEY (category_id)
+    REFERENCES ingredient_categories(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS food_ingredients (
@@ -142,6 +162,8 @@ CREATE TABLE IF NOT EXISTS meal_logs (
     FOREIGN KEY (user_id)
     REFERENCES users(id)
     ON DELETE CASCADE,
+  CONSTRAINT fk_meal_logs_type FOREIGN KEY (meal_type)
+    REFERENCES meal_types(code) ON DELETE RESTRICT,
   CONSTRAINT ck_meal_logs_portions CHECK (portion_size > 0 AND servings > 0),
   CONSTRAINT fk_meal_logs_food
     FOREIGN KEY (food_id)
@@ -196,7 +218,9 @@ CREATE TABLE IF NOT EXISTS meal_plan_items (
   CONSTRAINT fk_meal_plan_items_food
     FOREIGN KEY (food_id)
     REFERENCES food_items(id)
-    ON DELETE RESTRICT
+    ON DELETE RESTRICT,
+  CONSTRAINT fk_meal_plan_items_type FOREIGN KEY (meal_type)
+    REFERENCES meal_types(code) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS user_preferences (
@@ -344,11 +368,14 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
-  v_food food_items%ROWTYPE;
+  v_food_id TEXT;
   v_meal_id TEXT;
   v_ledger_id UUID := gen_random_uuid();
   v_previous_hash BYTEA;
   v_entry_hash BYTEA;
+  v_calories_kcal NUMERIC(12, 2);
+  v_protein_g NUMERIC(12, 2);
+  v_fiber_g NUMERIC(12, 2);
 BEGIN
   IF p_servings IS NULL OR p_servings <= 0 OR p_servings > 999.99 THEN
     RAISE EXCEPTION 'servings must be between 0 and 999.99';
@@ -357,9 +384,18 @@ BEGIN
   PERFORM set_config('app.user_id', p_user_id, true);
   PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id, 0));
 
-  SELECT * INTO STRICT v_food
+  SELECT id INTO STRICT v_food_id
   FROM food_items
   WHERE id = p_food_id AND is_active;
+
+  SELECT
+    COALESCE(MAX(fn.value) FILTER (WHERE nutrient.code = 'CAL'), 0),
+    COALESCE(MAX(fn.value) FILTER (WHERE nutrient.code = 'PROTEIN'), 0),
+    COALESCE(MAX(fn.value) FILTER (WHERE nutrient.code = 'FIBER'), 0)
+  INTO v_calories_kcal, v_protein_g, v_fiber_g
+  FROM food_nutrients AS fn
+  JOIN nutrients AS nutrient ON nutrient.id = fn.nutrient_id
+  WHERE fn.food_id = v_food_id;
 
   v_meal_id := gen_random_uuid()::TEXT;
   INSERT INTO meal_logs (id, user_id, food_id, meal_type, portion_size, servings, logged_at)
@@ -373,9 +409,9 @@ BEGIN
 
   v_entry_hash := digest(
     concat_ws('|', v_ledger_id, p_user_id, v_meal_id, p_food_id, p_servings,
-      COALESCE(v_food.calories_kcal, 0) * p_servings,
-      COALESCE(v_food.protein_g, 0) * p_servings,
-      COALESCE(v_food.fiber_g, 0) * p_servings,
+      v_calories_kcal * p_servings,
+      v_protein_g * p_servings,
+      v_fiber_g * p_servings,
       p_logged_at, encode(COALESCE(v_previous_hash, ''::BYTEA), 'hex')),
     'sha256'
   );
@@ -387,16 +423,16 @@ BEGIN
   )
   VALUES (
     v_ledger_id, p_user_id, v_meal_id, p_food_id, p_servings,
-    COALESCE(v_food.calories_kcal, 0) * p_servings,
-    COALESCE(v_food.protein_g, 0) * p_servings,
-    COALESCE(v_food.fiber_g, 0) * p_servings,
+    v_calories_kcal * p_servings,
+    v_protein_g * p_servings,
+    v_fiber_g * p_servings,
     p_logged_at, v_previous_hash, v_entry_hash
   );
 
   RETURN QUERY SELECT v_meal_id, v_ledger_id,
-    COALESCE(v_food.calories_kcal, 0) * p_servings,
-    COALESCE(v_food.protein_g, 0) * p_servings,
-    COALESCE(v_food.fiber_g, 0) * p_servings;
+    v_calories_kcal * p_servings,
+    v_protein_g * p_servings,
+    v_fiber_g * p_servings;
 END;
 $$;
 
@@ -417,17 +453,30 @@ SELECT
   food.nutrition_score,
   food.eco_score,
   food.recommendation,
-  food.calories_kcal,
-  food.protein_g,
-  food.carbs_g,
-  food.fat_g,
-  food.fiber_g,
-  food.sugar_g,
-  food.sodium_mg,
+  nutrition.calories_kcal,
+  nutrition.protein_g,
+  nutrition.carbs_g,
+  nutrition.fat_g,
+  nutrition.fiber_g,
+  nutrition.sugar_g,
+  nutrition.sodium_mg,
   COALESCE(reviews.review_count, 0) AS review_count,
   reviews.average_rating
 FROM food_items AS food
 LEFT JOIN food_categories AS category ON category.id = food.category_id
+LEFT JOIN LATERAL (
+  SELECT
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'CAL') AS calories_kcal,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'PROTEIN') AS protein_g,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'CARBS') AS carbs_g,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'FAT') AS fat_g,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'FIBER') AS fiber_g,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'SUGAR') AS sugar_g,
+    MAX(fn.value) FILTER (WHERE nutrient.code = 'SODIUM') AS sodium_mg
+  FROM food_nutrients AS fn
+  JOIN nutrients AS nutrient ON nutrient.id = fn.nutrient_id
+  WHERE fn.food_id = food.id
+) AS nutrition ON TRUE
 LEFT JOIN (
   SELECT food_id, COUNT(*) AS review_count, ROUND(AVG(rating)::NUMERIC, 2) AS average_rating
   FROM food_reviews
@@ -478,7 +527,7 @@ CREATE TABLE IF NOT EXISTS public.education (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug TEXT NOT NULL UNIQUE,
   title VARCHAR(120) NOT NULL,
-  category VARCHAR(80) NOT NULL DEFAULT 'Nutrisi',
+  category_id UUID NOT NULL REFERENCES public.education_categories(id) ON DELETE RESTRICT,
   summary TEXT NOT NULL,
   action TEXT NOT NULL DEFAULT '',
   icon VARCHAR(40) NOT NULL DEFAULT 'book-open',
@@ -487,6 +536,33 @@ CREATE TABLE IF NOT EXISTS public.education (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+DO $$
+DECLARE
+  v_table_name TEXT;
+BEGIN
+  FOREACH v_table_name IN ARRAY ARRAY[
+    'gender_options',
+    'activity_levels',
+    'dietary_goals',
+    'meal_types',
+    'ingredient_categories',
+    'education_categories'
+  ] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', v_table_name);
+    EXECUTE format('GRANT SELECT ON TABLE public.%I TO anon, authenticated', v_table_name);
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_policies
+      WHERE schemaname = 'public' AND tablename = v_table_name AND policyname = 'reference_data_read'
+    ) THEN
+      EXECUTE format(
+        'CREATE POLICY reference_data_read ON public.%I FOR SELECT TO anon, authenticated USING (TRUE)',
+        v_table_name
+      );
+    END IF;
+  END LOOP;
+END;
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_education_published_order
   ON public.education(sort_order, title)
@@ -533,14 +609,21 @@ CREATE TRIGGER trg_education_updated_at
 BEFORE UPDATE ON public.education
 FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-INSERT INTO public.education (slug, title, category, summary, action, icon, sort_order)
+INSERT INTO public.education_categories (slug, name)
 VALUES
-  ('piring-seimbang', 'Piring seimbang', 'Nutrisi', 'Isi piring dengan karbohidrat kompleks, protein, sayur, buah, dan lemak baik agar energi lebih stabil.', 'Target cepat: setengah piring sayur dan buah, lalu lengkapi dengan protein serta sumber karbohidrat.', 'utensils', 1),
-  ('protein-rendah-jejak', 'Protein rendah jejak', 'Keberlanjutan', 'Tempe, tahu, kacang merah, edamame, dan telur bisa membantu memenuhi protein tanpa emisi setinggi daging merah.', 'Mulai dari 2-3 kali makan berbasis protein nabati per minggu.', 'leaf', 2),
-  ('porsi-anti-mubazir', 'Porsi anti mubazir', 'Kebiasaan', 'Mengambil porsi sesuai lapar, membawa kotak makan, dan menghabiskan sisa makanan membantu menekan sampah pangan.', 'Pilih porsi kecil dulu, tambah bila masih lapar.', 'recycle', 3)
+  ('nutrisi', 'Nutrisi'),
+  ('keberlanjutan', 'Keberlanjutan'),
+  ('kebiasaan', 'Kebiasaan')
+ON CONFLICT (slug) DO NOTHING;
+
+INSERT INTO public.education (slug, title, category_id, summary, action, icon, sort_order)
+VALUES
+  ('piring-seimbang', 'Piring seimbang', (SELECT id FROM public.education_categories WHERE slug = 'nutrisi'), 'Isi piring dengan karbohidrat kompleks, protein, sayur, buah, dan lemak baik agar energi lebih stabil.', 'Target cepat: setengah piring sayur dan buah, lalu lengkapi dengan protein serta sumber karbohidrat.', 'utensils', 1),
+  ('protein-rendah-jejak', 'Protein rendah jejak', (SELECT id FROM public.education_categories WHERE slug = 'keberlanjutan'), 'Tempe, tahu, kacang merah, edamame, dan telur bisa membantu memenuhi protein tanpa emisi setinggi daging merah.', 'Mulai dari 2-3 kali makan berbasis protein nabati per minggu.', 'leaf', 2),
+  ('porsi-anti-mubazir', 'Porsi anti mubazir', (SELECT id FROM public.education_categories WHERE slug = 'kebiasaan'), 'Mengambil porsi sesuai lapar, membawa kotak makan, dan menghabiskan sisa makanan membantu menekan sampah pangan.', 'Pilih porsi kecil dulu, tambah bila masih lapar.', 'recycle', 3)
 ON CONFLICT (slug) DO UPDATE SET
   title = EXCLUDED.title,
-  category = EXCLUDED.category,
+  category_id = EXCLUDED.category_id,
   summary = EXCLUDED.summary,
   action = EXCLUDED.action,
   icon = EXCLUDED.icon,
@@ -563,6 +646,32 @@ BEGIN
     ) THEN
       ALTER PUBLICATION supabase_realtime ADD TABLE public.education;
     END IF;
+  END IF;
+END;
+$$;
+
+DO $$
+DECLARE
+  v_table RECORD;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    FOR v_table IN
+      SELECT c.relname
+      FROM pg_class AS c
+      JOIN pg_namespace AS n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind IN ('r', 'p')
+    LOOP
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_publication_tables
+        WHERE pubname = 'supabase_realtime'
+          AND schemaname = 'public'
+          AND tablename = v_table.relname
+      ) THEN
+        EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', v_table.relname);
+      END IF;
+    END LOOP;
   END IF;
 END;
 $$;

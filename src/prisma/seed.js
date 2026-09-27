@@ -196,6 +196,39 @@ async function main() {
     await prisma.nutrient.create({ data: nutrient });
   }
 
+  const nutrientRecords = await prisma.nutrient.findMany();
+  const nutrientIds = new Map(nutrientRecords.map(({ code, id }) => [code, id]));
+
+  await prisma.$executeRaw`
+    INSERT INTO meal_types (code, label) VALUES
+      ('Breakfast', 'Breakfast'), ('Lunch', 'Lunch'), ('Dinner', 'Dinner'),
+      ('Snack', 'Snack'), ('Hydration', 'Hydration')
+    ON CONFLICT (code) DO NOTHING
+  `;
+  await prisma.$executeRaw`
+    INSERT INTO education_categories (slug, name) VALUES
+      ('nutrisi', 'Nutrisi'), ('keberlanjutan', 'Keberlanjutan'), ('kebiasaan', 'Kebiasaan')
+    ON CONFLICT (slug) DO NOTHING
+  `;
+  await prisma.$executeRaw`
+    INSERT INTO gender_options (code, label) VALUES
+      ('female', 'Female'), ('male', 'Male'), ('non-binary', 'Non-binary'),
+      ('prefer-not-to-say', 'Prefer not to say')
+    ON CONFLICT (code) DO NOTHING
+  `;
+  await prisma.$executeRaw`
+    INSERT INTO activity_levels (code, label) VALUES
+      ('sedentary', 'Sedentary'), ('light', 'Light'), ('moderate', 'Moderate'),
+      ('active', 'Active'), ('very_active', 'Very active')
+    ON CONFLICT (code) DO NOTHING
+  `;
+  await prisma.$executeRaw`
+    INSERT INTO dietary_goals (code, label) VALUES
+      ('balanced', 'Balanced'), ('weight_loss', 'Weight loss'),
+      ('maintenance', 'Maintenance'), ('muscle_gain', 'Muscle gain')
+    ON CONFLICT (code) DO NOTHING
+  `;
+
   for (const food of foods) {
     const category = await prisma.foodCategory.findUnique({ where: { slug: food.category } });
 
@@ -211,24 +244,17 @@ async function main() {
         nutritionScore: food.nutritionScore,
         ecoScore: food.ecoScore,
         recommendation: food.recommendation,
-        caloriesKcal: food.caloriesKcal,
-        proteinG: food.proteinG,
-        carbsG: food.carbsG,
-        fatG: food.fatG,
-        fiberG: food.fiberG,
-        sugarG: food.sugarG,
-        sodiumMg: food.sodiumMg,
       },
     });
 
     const nutrientMap = {
-      CAL: created.caloriesKcal,
-      PROTEIN: created.proteinG,
-      CARBS: created.carbsG,
-      FAT: created.fatG,
-      FIBER: created.fiberG,
-      SUGAR: created.sugarG,
-      SODIUM: created.sodiumMg,
+      CAL: food.caloriesKcal,
+      PROTEIN: food.proteinG,
+      CARBS: food.carbsG,
+      FAT: food.fatG,
+      FIBER: food.fiberG,
+      SUGAR: food.sugarG,
+      SODIUM: food.sodiumMg,
     };
 
     for (const nutrient of nutrients) {
@@ -237,7 +263,7 @@ async function main() {
         await prisma.foodNutrient.create({
           data: {
             foodId: created.id,
-            nutrientId: (await prisma.nutrient.findUnique({ where: { code: nutrient.code } })).id,
+            nutrientId: nutrientIds.get(nutrient.code),
             value,
           },
         });

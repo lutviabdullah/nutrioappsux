@@ -11,18 +11,21 @@ model User {
   id            String          @id @default(cuid())
   email         String          @unique
   username      String          @unique
-  fullName      String?
+  fullName      String?         @map("full_name")
   age           Int?
   gender        String?
-  heightCm      Int?
-  weightKg      Decimal?        @db.Decimal(5, 2)
-  activityLevel String?
-  dietaryGoal   String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  heightCm      Int?            @map("height_cm")
+  weightKg      Decimal?        @map("weight_kg") @db.Decimal(5, 2)
+  activityLevel String?         @map("activity_level")
+  dietaryGoal   String?         @map("dietary_goal")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
   mealLogs      MealLog[]
   mealPlans     MealPlan[]
   preferences   UserPreference[]
+  nutritionLedgerEntries NutritionLedgerEntry[]
+
+  @@map("users")
 }
 
 model FoodCategory {
@@ -30,8 +33,10 @@ model FoodCategory {
   slug      String     @unique
   name      String     @unique
   description String?
-  createdAt DateTime   @default(now())
+  createdAt DateTime   @default(now()) @map("created_at")
   foodItems FoodItem[]
+
+  @@map("food_categories")
 }
 
 model FoodItem {
@@ -40,28 +45,33 @@ model FoodItem {
   name            String
   subtitle        String?
   emoji           String?
-  categoryId      String?
-  category        FoodCategory?     @relation(fields: [categoryId], references: [id])
+  categoryId      String?           @map("category_id")
+  category        FoodCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull, map: "fk_food_items_category")
   description     String?
-  basePrice       Decimal           @db.Decimal(10, 2)
-  nutritionScore  Int
-  ecoScore        Int
+  basePrice       Decimal           @map("base_price") @db.Decimal(10, 2)
+  nutritionScore  Int               @map("nutrition_score") @db.SmallInt
+  ecoScore        Int               @map("eco_score") @db.SmallInt
   recommendation  String?
-  caloriesKcal    Int?
-  proteinG        Decimal?          @db.Decimal(5, 2)
-  carbsG          Decimal?          @db.Decimal(5, 2)
-  fatG            Decimal?          @db.Decimal(5, 2)
-  fiberG          Decimal?          @db.Decimal(5, 2)
-  sugarG          Decimal?          @db.Decimal(5, 2)
-  sodiumMg        Int?
-  isActive        Boolean           @default(true)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  caloriesKcal    Int?              @map("calories_kcal")
+  proteinG        Decimal?          @map("protein_g") @db.Decimal(5, 2)
+  carbsG          Decimal?          @map("carbs_g") @db.Decimal(5, 2)
+  fatG            Decimal?          @map("fat_g") @db.Decimal(5, 2)
+  fiberG          Decimal?          @map("fiber_g") @db.Decimal(5, 2)
+  sugarG          Decimal?          @map("sugar_g") @db.Decimal(5, 2)
+  sodiumMg        Int?              @map("sodium_mg")
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
   ingredients     FoodIngredient[]
   mealLogs        MealLog[]
   mealPlanItems   MealPlanItem[]
   foodNutrients   FoodNutrient[]
   reviews         FoodReview[]
+  nutritionLedgerEntries NutritionLedgerEntry[]
+
+  @@index([categoryId], map: "idx_food_items_category")
+  @@index([name], map: "idx_food_items_name")
+  @@map("food_items")
 }
 
 model Nutrient {
@@ -70,20 +80,25 @@ model Nutrient {
   name        String
   unit        String
   description String?
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime       @default(now()) @map("created_at")
   foodNutrients FoodNutrient[]
+
+  @@map("nutrients")
 }
 
 model FoodNutrient {
   id         String   @id @default(cuid())
-  foodId     String
-  nutrientId String
+  foodId     String   @map("food_id")
+  nutrientId String   @map("nutrient_id")
   value      Decimal  @db.Decimal(8, 2)
-  createdAt  DateTime @default(now())
-  food       FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade)
-  nutrient   Nutrient @relation(fields: [nutrientId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+  food       FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade, map: "fk_food_nutrients_food")
+  nutrient   Nutrient @relation(fields: [nutrientId], references: [id], onDelete: Cascade, map: "fk_food_nutrients_nutrient")
 
-  @@unique([foodId, nutrientId])
+  @@unique([foodId, nutrientId], map: "uk_food_nutrients")
+  @@index([foodId], map: "idx_food_nutrients_food")
+  @@index([nutrientId, foodId], map: "idx_food_nutrients_nutrient_food")
+  @@map("food_nutrients")
 }
 
 model Ingredient {
@@ -91,74 +106,131 @@ model Ingredient {
   name        String          @unique
   category    String?
   description String?
-  createdAt   DateTime        @default(now())
+  createdAt   DateTime        @default(now()) @map("created_at")
   foodIngredients FoodIngredient[]
+
+  @@map("ingredients")
 }
 
 model FoodIngredient {
   id            String      @id @default(cuid())
-  foodId        String
-  ingredientId  String
-  quantityG     Decimal?    @db.Decimal(6, 2)
+  foodId        String      @map("food_id")
+  ingredientId  String      @map("ingredient_id")
+  quantityG     Decimal?    @map("quantity_g") @db.Decimal(6, 2)
   notes         String?
-  food          FoodItem    @relation(fields: [foodId], references: [id], onDelete: Cascade)
-  ingredient    Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  food          FoodItem    @relation(fields: [foodId], references: [id], onDelete: Cascade, map: "fk_food_ingredients_food")
+  ingredient    Ingredient  @relation(fields: [ingredientId], references: [id], onDelete: Cascade, map: "fk_food_ingredients_ingredient")
 
-  @@unique([foodId, ingredientId])
+  @@unique([foodId, ingredientId], map: "uk_food_ingredients")
+  @@index([ingredientId, foodId], map: "idx_food_ingredients_ingredient")
+  @@map("food_ingredients")
 }
 
 model MealLog {
   id          String   @id @default(cuid())
-  userId      String
-  foodId      String
-  mealType    String
-  portionSize Decimal  @db.Decimal(5, 2)
+  userId      String   @map("user_id")
+  foodId      String   @map("food_id")
+  mealType    String   @map("meal_type")
+  portionSize Decimal  @default(1.00) @map("portion_size") @db.Decimal(5, 2)
   servings    Decimal  @db.Decimal(5, 2) @default(1.00)
-  loggedAt    DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  loggedAt    DateTime @default(now()) @map("logged_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_meal_logs_user")
+  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Restrict, map: "fk_meal_logs_food")
+  ledgerEntry NutritionLedgerEntry?
+
+  @@index([userId, loggedAt(sort: Desc)], map: "idx_meal_logs_user_time")
+  @@index([userId, foodId, loggedAt(sort: Desc)], map: "idx_meal_logs_user_food_time")
+  @@map("meal_logs")
 }
 
 model MealPlan {
   id          String         @id @default(cuid())
-  userId      String
+  userId      String         @map("user_id")
   name        String
   description String?
-  startDate   DateTime
-  endDate     DateTime?
-  createdAt   DateTime       @default(now())
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate   DateTime       @map("start_date")
+  endDate     DateTime?      @map("end_date")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_meal_plans_user")
   items       MealPlanItem[]
+
+  @@index([userId, startDate(sort: Desc), endDate], map: "idx_meal_plans_user_dates")
+  @@map("meal_plans")
 }
 
 model MealPlanItem {
   id            String     @id @default(cuid())
-  mealPlanId    String
-  foodId        String
-  dayOfWeek     String?
-  mealType      String?
-  targetServings Decimal    @db.Decimal(5, 2) @default(1.00)
-  mealPlan      MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  food          FoodItem   @relation(fields: [foodId], references: [id], onDelete: Restrict)
+  mealPlanId     String     @map("meal_plan_id")
+  foodId         String     @map("food_id")
+  dayOfWeek      String?    @map("day_of_week")
+  mealType       String?    @map("meal_type")
+  targetServings Decimal    @default(1.00) @map("target_servings") @db.Decimal(5, 2)
+  mealPlan      MealPlan   @relation(fields: [mealPlanId], references: [id], onDelete: Cascade, map: "fk_meal_plan_items_meal_plan")
+  food          FoodItem   @relation(fields: [foodId], references: [id], onDelete: Restrict, map: "fk_meal_plan_items_food")
+
+  @@index([mealPlanId, dayOfWeek], map: "idx_meal_plan_items_plan_day")
+  @@index([foodId, mealPlanId], map: "idx_meal_plan_items_food")
+  @@map("meal_plan_items")
 }
 
 model UserPreference {
   id              String   @id @default(cuid())
-  userId          String
-  preferenceName  String
-  preferenceValue String
-  createdAt       DateTime @default(now())
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String   @map("user_id")
+  preferenceName  String   @map("preference_name")
+  preferenceValue String   @map("preference_value")
+  createdAt       DateTime @default(now()) @map("created_at")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_user_preferences_user")
 
-  @@unique([userId, preferenceName])
+  @@unique([userId, preferenceName], map: "uk_user_preferences")
+  @@map("user_preferences")
 }
 
 model FoodReview {
   id          String   @id @default(cuid())
-  foodId      String
-  reviewerName String
-  rating      Int
+  foodId      String   @map("food_id")
+  reviewerName String  @map("reviewer_name")
+  rating      Int      @db.SmallInt
   comment     String?
-  createdAt   DateTime @default(now())
-  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now()) @map("created_at")
+  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Cascade, map: "fk_food_reviews_food")
+
+  @@index([foodId, createdAt(sort: Desc)], map: "idx_food_reviews_food_time")
+  @@map("food_reviews")
+}
+
+model AuditEvent {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableName  String   @map("table_name")
+  rowId      String   @map("row_id")
+  operation  String   @db.Char(1)
+  oldRow     Json?    @map("old_row") @db.JsonB
+  newRow     Json?    @map("new_row") @db.JsonB
+  actorId    String?  @map("actor_id")
+  requestId  String?  @map("request_id")
+  occurredAt DateTime @default(dbgenerated("clock_timestamp()")) @map("occurred_at") @db.Timestamptz(6)
+
+  @@index([tableName, rowId, occurredAt(sort: Desc)], map: "idx_audit_table_row_time")
+  @@map("audit_events")
+}
+
+model NutritionLedgerEntry {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id")
+  mealLogId   String   @unique @map("meal_log_id")
+  foodId      String   @map("food_id")
+  servings    Decimal  @db.Decimal(8, 2)
+  caloriesKcal Decimal @map("calories_kcal") @db.Decimal(12, 2)
+  proteinG    Decimal  @map("protein_g") @db.Decimal(12, 2)
+  fiberG      Decimal  @map("fiber_g") @db.Decimal(12, 2)
+  occurredAt  DateTime @map("occurred_at") @db.Timestamptz(6)
+  recordedAt  DateTime @default(dbgenerated("clock_timestamp()")) @map("recorded_at") @db.Timestamptz(6)
+  previousHash Bytes?  @map("previous_hash") @db.ByteA
+  entryHash   Bytes    @unique @map("entry_hash") @db.ByteA
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict, map: "fk_ledger_user")
+  mealLog     MealLog  @relation(fields: [mealLogId], references: [id], onDelete: Restrict, map: "fk_ledger_meal")
+  food        FoodItem @relation(fields: [foodId], references: [id], onDelete: Restrict, map: "fk_ledger_food")
+
+  @@index([userId, occurredAt(sort: Desc), id(sort: Desc)], map: "idx_ledger_user_time")
+  @@map("nutrition_ledger_entries")
 }

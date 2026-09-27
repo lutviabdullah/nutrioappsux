@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -7,6 +7,7 @@ import {
   BookOpen,
   Calculator,
   Check,
+  CircleDot,
   Droplets,
   Flame,
   GraduationCap,
@@ -20,6 +21,7 @@ import {
   User,
   UtensilsCrossed,
 } from 'lucide-react';
+import { getOrCreateAnonymousSession, supabase } from './supabaseClient';
 import './styles.css';
 
 const indonesianMenuCatalog = [
@@ -337,6 +339,30 @@ const educationTopics = [
   },
 ];
 
+const educationIcons = {
+  utensils: UtensilsCrossed,
+  leaf: Leaf,
+  recycle: Recycle,
+};
+
+const defaultProfile = {
+  full_name: 'Alya Pradana',
+  university: '',
+  faculty: 'Teknik Informatika',
+  semester: 6,
+};
+
+function mapEducationRow(row) {
+  return {
+    id: row.id,
+    sortOrder: row.sort_order,
+    title: row.title,
+    icon: educationIcons[row.icon] || BookOpen,
+    text: row.summary,
+    action: row.action,
+  };
+}
+
 const balancedIngredients = [
   {
     group: 'Karbohidrat kompleks',
@@ -439,6 +465,94 @@ function App() {
   const [activeInsight, setActiveInsight] = useState('nutrition');
   const [selectedPeriod, setSelectedPeriod] = useState('minggu');
   const [profileHabits, setProfileHabits] = useState(initialProfileHabits);
+  const [educationContent, setEducationContent] = useState(educationTopics);
+  const [profile, setProfile] = useState(defaultProfile);
+  const [profileDraft, setProfileDraft] = useState(defaultProfile);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState('connecting');
+  const [supabaseUserId, setSupabaseUserId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let channel;
+
+    const savedProfile = localStorage.getItem('nutrio-profile');
+    if (savedProfile) {
+      try {
+        const parsedProfile = { ...defaultProfile, ...JSON.parse(savedProfile) };
+        setProfile(parsedProfile);
+        setProfileDraft(parsedProfile);
+      } catch {
+        localStorage.removeItem('nutrio-profile');
+      }
+    }
+
+    if (!supabase) {
+      setSupabaseStatus('setup');
+      return () => {};
+    }
+
+    const connect = async () => {
+      try {
+        const session = await getOrCreateAnonymousSession();
+        if (!session || cancelled) return;
+        const userId = session.user.id;
+        setSupabaseUserId(userId);
+
+        channel = supabase
+          .channel(`nutrio-live-${userId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, (payload) => {
+            setEducationContent((current) => {
+              const changedRow = payload.eventType === 'DELETE' ? payload.old : payload.new;
+              const rows = current.filter((topic) => topic.id !== changedRow.id);
+              if (payload.eventType !== 'DELETE' && payload.new.is_published) {
+                rows.push(mapEducationRow(payload.new));
+              }
+              return rows.sort((first, second) => (first.sortOrder || 0) - (second.sortOrder || 0));
+            });
+          })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `user_id=eq.${userId}`,
+          }, (payload) => {
+            if (payload.eventType !== 'DELETE' && payload.new) {
+              setProfile((current) => ({ ...current, ...payload.new }));
+            }
+          })
+          .subscribe((status) => {
+            if (!cancelled) {
+              setSupabaseStatus(status === 'SUBSCRIBED' ? 'live' : 'offline');
+            }
+          });
+
+        const [profileResult, educationResult] = await Promise.all([
+          supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+          supabase.from('education').select('*').eq('is_published', true).order('sort_order'),
+        ]);
+
+        if (cancelled) return;
+        if (profileResult.error || educationResult.error) throw profileResult.error || educationResult.error;
+        if (profileResult.data) {
+          setProfile((current) => ({ ...current, ...profileResult.data }));
+          setProfileDraft((current) => ({ ...current, ...profileResult.data }));
+        }
+        if (educationResult.data?.length) {
+          setEducationContent(educationResult.data.map(mapEducationRow));
+        }
+      } catch (error) {
+        console.warn('Supabase profile/education sync unavailable:', error.message);
+        if (!cancelled) setSupabaseStatus('offline');
+      }
+    };
+
+    connect();
+    return () => {
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   const selected = useMemo(
     () => menuOptions.find((item) => item.id === selectedMenu) ?? menuOptions[0],
@@ -490,6 +604,34 @@ function App() {
     );
   };
 
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    const nextProfile = {
+      ...profileDraft,
+      semester: profileDraft.semester ? Number(profileDraft.semester) : null,
+    };
+    setProfile(nextProfile);
+    localStorage.setItem('nutrio-profile', JSON.stringify(nextProfile));
+    setIsEditingProfile(false);
+
+    if (!supabase || !supabaseUserId) {
+      setSupabaseStatus(supabase ? 'offline' : 'setup');
+      return;
+    }
+
+    const { error } = await supabase.from('profiles').upsert({
+      user_id: supabaseUserId,
+      full_name: nextProfile.full_name,
+      university: nextProfile.university,
+      faculty: nextProfile.faculty,
+      semester: nextProfile.semester,
+    });
+    if (error) {
+      console.warn('Profile sync failed:', error.message);
+      setSupabaseStatus('offline');
+    }
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -500,6 +642,12 @@ function App() {
         <div className="topbar-actions">
           <div className="topbar-icon">
             <Leaf size={20} />
+          </div>
+          <div className={`live-status ${supabaseStatus}`} aria-live="polite">
+            <CircleDot size={12} />
+            <span className="sr-only">
+              {supabaseStatus === 'live' ? 'Supabase live' : supabaseStatus === 'setup' ? 'Mode lokal' : 'Supabase offline'}
+            </span>
           </div>
           <div className="pill">Skor nutrisi</div>
         </div>
@@ -631,7 +779,7 @@ function App() {
             </section>
 
             <section className="education-grid">
-              {educationTopics.map((topic) => {
+              {educationContent.map((topic) => {
                 const Icon = topic.icon;
                 return (
                   <article className="education-card" key={topic.title}>
@@ -694,13 +842,60 @@ function App() {
                 </div>
                 <div className="profile-copy">
                   <div className="eyebrow">Mahasiswa sehat</div>
-                  <h3>Alya Pradana</h3>
-                  <p>Teknik Informatika • Semester 6</p>
+                  <h3>{profile.full_name || 'Nutrio User'}</h3>
+                    <p>{profile.faculty || 'Mahasiswa'}{profile.semester ? ` • Semester ${profile.semester}` : ''}</p>
                 </div>
-                <button type="button" className="secondary-btn small-btn">
+                <button type="button" className="secondary-btn small-btn" onClick={() => {
+                  setProfileDraft(profile);
+                  setIsEditingProfile((current) => !current);
+                }}>
                   Edit profil
                 </button>
               </div>
+
+              {isEditingProfile && (
+                <form className="profile-edit-form" onSubmit={saveProfile}>
+                  <label>
+                    Nama
+                    <input
+                      value={profileDraft.full_name || ''}
+                      onChange={(event) => setProfileDraft({ ...profileDraft, full_name: event.target.value })}
+                      maxLength={120}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Universitas
+                    <input
+                      value={profileDraft.university || ''}
+                      onChange={(event) => setProfileDraft({ ...profileDraft, university: event.target.value })}
+                      maxLength={160}
+                    />
+                  </label>
+                  <label>
+                    Fakultas / program studi
+                    <input
+                      value={profileDraft.faculty || ''}
+                      onChange={(event) => setProfileDraft({ ...profileDraft, faculty: event.target.value })}
+                      maxLength={160}
+                    />
+                  </label>
+                  <label>
+                    Semester
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={profileDraft.semester || ''}
+                      onChange={(event) => setProfileDraft({ ...profileDraft, semester: event.target.value })}
+                    />
+                  </label>
+                  <div className="profile-form-actions">
+                    <button type="button" className="secondary-btn small-btn" onClick={() => setIsEditingProfile(false)}>Batal</button>
+                    <button type="submit" className="primary-btn small-btn">Simpan</button>
+                  </div>
+                </form>
+              )}
 
               <div className="profile-summary">
                 <div>

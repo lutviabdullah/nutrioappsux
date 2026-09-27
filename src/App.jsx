@@ -15,6 +15,8 @@ import {
   Home,
   Leaf,
   Recycle,
+  RefreshCw,
+  Search,
   Sparkles,
   Target,
   TrendingUp,
@@ -471,6 +473,11 @@ function App() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [supabaseStatus, setSupabaseStatus] = useState('connecting');
   const [supabaseUserId, setSupabaseUserId] = useState(null);
+  const [catalogRows, setCatalogRows] = useState(indonesianMenuCatalog);
+  const [catalogQuery, setCatalogQuery] = useState('');
+  const [catalogRefreshToken, setCatalogRefreshToken] = useState(0);
+  const [catalogStatus, setCatalogStatus] = useState('local');
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -554,12 +561,79 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (activePage !== 'catalog') return undefined;
+
+    let cancelled = false;
+    const loadCatalog = async () => {
+      if (!supabase) {
+        setCatalogRows(indonesianMenuCatalog);
+        setCatalogStatus('local');
+        return;
+      }
+
+      setCatalogLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('v_food_catalog')
+          .select('*')
+          .order('nutrition_score', { ascending: false });
+
+        if (error) throw error;
+        if (cancelled) return;
+
+        if (data?.length) {
+          setCatalogRows(data.map((row) => ({
+            id: row.food_id,
+            name: row.name,
+            subtitle: row.subtitle || row.description || '',
+            emoji: row.emoji,
+            category: row.category_name || 'Menu',
+            basePrice: Number(row.base_price || 0),
+            nutritionScore: Number(row.nutrition_score || 0),
+            ecoScore: Number(row.eco_score || 0),
+            recommendation: row.recommendation || '',
+            caloriesKcal: row.calories_kcal == null ? null : Number(row.calories_kcal),
+            proteinG: row.protein_g == null ? null : Number(row.protein_g),
+            fiberG: row.fiber_g == null ? null : Number(row.fiber_g),
+            reviewCount: Number(row.review_count || 0),
+            averageRating: row.average_rating == null ? null : Number(row.average_rating),
+          })));
+          setCatalogStatus('supabase');
+        } else {
+          setCatalogRows(indonesianMenuCatalog);
+          setCatalogStatus('empty');
+        }
+      } catch (error) {
+        console.warn('Catalog view unavailable:', error.message);
+        if (!cancelled) {
+          setCatalogRows(indonesianMenuCatalog);
+          setCatalogStatus('fallback');
+        }
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    };
+
+    loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [activePage, catalogRefreshToken]);
+
   const selected = useMemo(
     () => menuOptions.find((item) => item.id === selectedMenu) ?? menuOptions[0],
     [selectedMenu]
   );
 
   const featured = menuOptions.slice(0, 3);
+  const filteredCatalogRows = useMemo(() => {
+    const query = catalogQuery.trim().toLocaleLowerCase('id-ID');
+    if (!query) return catalogRows;
+    return catalogRows.filter((item) =>
+      `${item.name} ${item.subtitle} ${item.category}`.toLocaleLowerCase('id-ID').includes(query)
+    );
+  }, [catalogRows, catalogQuery]);
 
   const insightData = {
     nutrition: {
@@ -758,6 +832,84 @@ function App() {
                 ))}
               </div>
             </section>
+          </>
+        ) : activePage === 'catalog' ? (
+          <>
+            <section className="catalog-heading">
+              <div>
+                <div className="eyebrow">
+                  <HeartPulse size={15} />
+                  <span>Menu database</span>
+                </div>
+                <h2>Menu &amp; gizi</h2>
+                <p>Data menu dan nutrisi dari katalog Nutrio.</p>
+              </div>
+              <button
+                type="button"
+                className="catalog-refresh"
+                aria-label="Muat ulang katalog"
+                title="Muat ulang katalog"
+                disabled={catalogLoading}
+                onClick={() => setCatalogRefreshToken((token) => token + 1)}
+              >
+                <RefreshCw size={17} className={catalogLoading ? 'is-spinning' : ''} />
+              </button>
+            </section>
+
+            <label className="catalog-search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                type="search"
+                value={catalogQuery}
+                onChange={(event) => setCatalogQuery(event.target.value)}
+                placeholder="Cari menu atau kategori"
+                aria-label="Cari menu atau kategori"
+              />
+            </label>
+
+            <p className="catalog-status" aria-live="polite">
+              {catalogLoading
+                ? 'Memuat katalog…'
+                : catalogStatus === 'supabase'
+                  ? `${filteredCatalogRows.length} menu dari Supabase`
+                  : catalogStatus === 'empty'
+                    ? 'Belum ada menu di Supabase; menampilkan katalog contoh.'
+                    : catalogStatus === 'fallback'
+                      ? 'Supabase tidak tersedia; menampilkan katalog contoh.'
+                      : 'Katalog contoh lokal'}
+            </p>
+
+            {filteredCatalogRows.length ? (
+              <section className="food-view-grid">
+                {filteredCatalogRows.map((item) => (
+                  <article className="food-view-item" key={item.id}>
+                    <div className="food-view-top">
+                      <span className="food-view-emoji" aria-hidden="true">{item.emoji || '🥗'}</span>
+                      <span className="chip">{item.category}</span>
+                    </div>
+                    <h3>{item.name}</h3>
+                    <p className="food-view-subtitle">{item.subtitle}</p>
+                    <div className="food-view-price">Rp{Number(item.basePrice || 0).toLocaleString('id-ID')}</div>
+                    <div className="food-view-scores">
+                      <span>Gizi <strong>{item.nutritionScore}%</strong></span>
+                      <span>Bumi <strong>{item.ecoScore}%</strong></span>
+                    </div>
+                    {item.caloriesKcal != null && (
+                      <div className="food-view-macros">
+                        <span>{item.caloriesKcal} kcal</span>
+                        {item.proteinG != null && <span>Protein {item.proteinG} g</span>}
+                        {item.fiberG != null && <span>Serat {item.fiberG} g</span>}
+                      </div>
+                    )}
+                    {item.averageRating != null && (
+                      <p className="food-view-rating">Rating {item.averageRating} · {item.reviewCount} ulasan</p>
+                    )}
+                  </article>
+                ))}
+              </section>
+            ) : (
+              <p className="catalog-empty">Tidak ada menu yang cocok dengan pencarian.</p>
+            )}
           </>
         ) : activePage === 'education' ? (
           <>
@@ -1121,6 +1273,10 @@ function App() {
         <button className={`nav-item ${activePage === 'ecocalc' ? 'active' : ''}`} type="button" onClick={() => setActivePage('ecocalc')}>
           <Calculator size={18} />
           <span>NutriCalc</span>
+        </button>
+        <button className={`nav-item ${activePage === 'catalog' ? 'active' : ''}`} type="button" onClick={() => setActivePage('catalog')}>
+          <HeartPulse size={18} />
+          <span>Menu &amp; gizi</span>
         </button>
         <button className={`nav-item ${activePage === 'education' ? 'active' : ''}`} type="button" onClick={() => setActivePage('education')}>
           <GraduationCap size={18} />

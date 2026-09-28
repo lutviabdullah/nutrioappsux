@@ -14,6 +14,10 @@ import {
   HeartPulse,
   Home,
   Leaf,
+  LogIn,
+  LogOut,
+  LockKeyhole,
+  Mail,
   Recycle,
   RefreshCw,
   Search,
@@ -23,7 +27,7 @@ import {
   User,
   UtensilsCrossed,
 } from 'lucide-react';
-import { getOrCreateAnonymousSession, supabase } from './supabaseClient';
+import { supabase } from './supabaseClient';
 import './styles.css';
 
 const indonesianMenuCatalog = [
@@ -463,6 +467,22 @@ const initialProfileHabits = [
 
 function App() {
   const [activePage, setActivePage] = useState('home');
+  const [authSession, setAuthSession] = useState(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [demoUser, setDemoUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('nutrio-demo-session') || 'null');
+    } catch {
+      return null;
+    }
+  });
   const [selectedMenu, setSelectedMenu] = useState(menuOptions[0].id);
   const [activeInsight, setActiveInsight] = useState('nutrition');
   const [selectedPeriod, setSelectedPeriod] = useState('minggu');
@@ -481,7 +501,6 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    let channel;
 
     const savedProfile = localStorage.getItem('nutrio-profile');
     if (savedProfile) {
@@ -496,51 +515,81 @@ function App() {
 
     if (!supabase) {
       setSupabaseStatus('setup');
+      setIsAuthReady(true);
       return () => {};
     }
 
-    const connect = async () => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) {
+        setAuthSession(session);
+        setIsAuthReady(true);
+      }
+    });
+
+    supabase.auth.getSession()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (!cancelled) setAuthSession(data.session);
+      })
+      .catch((error) => {
+        console.warn('Supabase session restore failed:', error.message);
+        if (!cancelled) setSupabaseStatus('offline');
+      })
+      .finally(() => {
+        if (!cancelled) setIsAuthReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !authSession) {
+      setSupabaseUserId(null);
+      return () => {};
+    }
+
+    let cancelled = false;
+    const userId = authSession.user.id;
+    setSupabaseUserId(userId);
+
+    const channel = supabase
+      .channel(`nutrio-live-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, (payload) => {
+        setEducationContent((current) => {
+          const changedRow = payload.eventType === 'DELETE' ? payload.old : payload.new;
+          const rows = current.filter((topic) => topic.id !== changedRow.id);
+          if (payload.eventType !== 'DELETE' && payload.new.is_published) {
+            rows.push(mapEducationRow(payload.new));
+          }
+          return rows.sort((first, second) => (first.sortOrder || 0) - (second.sortOrder || 0));
+        });
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'profiles',
+        filter: `user_id=eq.${userId}`,
+      }, (payload) => {
+        if (payload.eventType !== 'DELETE' && payload.new) {
+          setProfile((current) => ({ ...current, ...payload.new }));
+        }
+      })
+      .subscribe((status) => {
+        if (!cancelled) setSupabaseStatus(status === 'SUBSCRIBED' ? 'live' : 'offline');
+      });
+
+    const loadUserData = async () => {
       try {
-        const session = await getOrCreateAnonymousSession();
-        if (!session || cancelled) return;
-        const userId = session.user.id;
-        setSupabaseUserId(userId);
-
-        channel = supabase
-          .channel(`nutrio-live-${userId}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, (payload) => {
-            setEducationContent((current) => {
-              const changedRow = payload.eventType === 'DELETE' ? payload.old : payload.new;
-              const rows = current.filter((topic) => topic.id !== changedRow.id);
-              if (payload.eventType !== 'DELETE' && payload.new.is_published) {
-                rows.push(mapEducationRow(payload.new));
-              }
-              return rows.sort((first, second) => (first.sortOrder || 0) - (second.sortOrder || 0));
-            });
-          })
-          .on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'profiles',
-            filter: `user_id=eq.${userId}`,
-          }, (payload) => {
-            if (payload.eventType !== 'DELETE' && payload.new) {
-              setProfile((current) => ({ ...current, ...payload.new }));
-            }
-          })
-          .subscribe((status) => {
-            if (!cancelled) {
-              setSupabaseStatus(status === 'SUBSCRIBED' ? 'live' : 'offline');
-            }
-          });
-
         const [profileResult, educationResult] = await Promise.all([
           supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
           supabase.from('education').select('*').eq('is_published', true).order('sort_order'),
         ]);
 
-        if (cancelled) return;
         if (profileResult.error || educationResult.error) throw profileResult.error || educationResult.error;
+        if (cancelled) return;
         if (profileResult.data) {
           setProfile((current) => ({ ...current, ...profileResult.data }));
           setProfileDraft((current) => ({ ...current, ...profileResult.data }));
@@ -554,12 +603,12 @@ function App() {
       }
     };
 
-    connect();
+    loadUserData();
     return () => {
       cancelled = true;
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
-  }, []);
+  }, [authSession]);
 
   useEffect(() => {
     if (activePage !== 'catalog') return undefined;
@@ -678,6 +727,71 @@ function App() {
     );
   };
 
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault();
+    setAuthError('');
+    setAuthMessage('');
+
+    if (!supabase) {
+      setAuthError('Login online belum tersedia. Gunakan mode demo atau atur kredensial Supabase.');
+      return;
+    }
+
+    setIsAuthenticating(true);
+    try {
+      if (authMode === 'signup') {
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail.trim(),
+          password: authPassword,
+          options: { data: { full_name: authName.trim() } },
+        });
+        if (error) throw error;
+        if (!data.session) {
+          setAuthMessage('Akun berhasil dibuat. Periksa email untuk menyelesaikan verifikasi.');
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail.trim(),
+          password: authPassword,
+        });
+        if (error) throw error;
+      }
+    } catch (error) {
+      setAuthError(error.message || 'Autentikasi gagal. Silakan coba lagi.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const enterDemoMode = () => {
+    const nextUser = { name: 'Alya Pradana', email: 'alya@nutrio.app' };
+    localStorage.setItem('nutrio-demo-session', JSON.stringify(nextUser));
+    setDemoUser(nextUser);
+    setAuthError('');
+  };
+
+  const signOut = async () => {
+    setAuthError('');
+    if (supabase && authSession) {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        setAuthError(error.message || 'Tidak dapat keluar dari akun.');
+        return;
+      }
+    }
+    localStorage.removeItem('nutrio-demo-session');
+    localStorage.removeItem('nutrio-profile');
+    setProfile(defaultProfile);
+    setProfileDraft(defaultProfile);
+    setDemoUser(null);
+    setActivePage('home');
+  };
+
+  const displayName = authSession?.user?.user_metadata?.full_name
+    || authSession?.user?.email?.split('@')[0]
+    || demoUser?.name
+    || 'Nutrio User';
+
   const saveProfile = async (event) => {
     event.preventDefault();
     const nextProfile = {
@@ -706,6 +820,112 @@ function App() {
     }
   };
 
+  if (!isAuthReady) {
+    return (
+      <main className="auth-loading" aria-live="polite">
+        <Leaf size={22} />
+        <span>Menyiapkan Nutrio...</span>
+      </main>
+    );
+  }
+
+  if (!authSession && !demoUser) {
+    return (
+      <main className="auth-page">
+        <section className="auth-panel" aria-labelledby="auth-title">
+          <div className="auth-brand">
+            <span className="auth-brand-mark"><Leaf size={21} /></span>
+            <span>Nutrio</span>
+          </div>
+          <p className="auth-eyebrow">NUTRISI INDONESIA, LEBIH TERARAH</p>
+          <h1 id="auth-title">Mulai dari pilihan yang lebih baik.</h1>
+          <p className="auth-intro">Masuk untuk melanjutkan perjalanan sehat dan melihat ringkasan Nutrio Anda.</p>
+
+          <div className="auth-tabs" role="tablist" aria-label="Jenis autentikasi">
+            <button
+              className={authMode === 'login' ? 'active' : ''}
+              type="button"
+              role="tab"
+              aria-selected={authMode === 'login'}
+              onClick={() => { setAuthMode('login'); setAuthError(''); setAuthMessage(''); }}
+            >
+              Masuk
+            </button>
+            <button
+              className={authMode === 'signup' ? 'active' : ''}
+              type="button"
+              role="tab"
+              aria-selected={authMode === 'signup'}
+              onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthMessage(''); }}
+            >
+              Buat akun
+            </button>
+          </div>
+
+          <form className="auth-form" onSubmit={handleAuthSubmit}>
+            {authMode === 'signup' && (
+              <label>
+                Nama lengkap
+                <input
+                  autoComplete="name"
+                  value={authName}
+                  onChange={(event) => setAuthName(event.target.value)}
+                  placeholder="Nama Anda"
+                  required
+                />
+              </label>
+            )}
+            <label>
+              Email
+              <span className="auth-input-wrap">
+                <Mail size={17} aria-hidden="true" />
+                <input
+                  autoComplete="email"
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="nama@email.com"
+                  required
+                />
+              </span>
+            </label>
+            <label>
+              Kata sandi
+              <span className="auth-input-wrap">
+                <LockKeyhole size={17} aria-hidden="true" />
+                <input
+                  autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="Minimal 6 karakter"
+                  minLength={6}
+                  required
+                />
+              </span>
+            </label>
+            {authError && <p className="auth-feedback error" role="alert">{authError}</p>}
+            {authMessage && <p className="auth-feedback success" role="status">{authMessage}</p>}
+            <button className="auth-submit" type="submit" disabled={isAuthenticating || !supabase}>
+              {isAuthenticating ? 'Memproses...' : authMode === 'signup' ? 'Buat akun' : 'Masuk ke Nutrio'}
+              <LogIn size={17} />
+            </button>
+          </form>
+
+          {!supabase && (
+            <div className="auth-demo">
+              <p>Supabase belum dikonfigurasi di environment ini. Coba aplikasi dengan akun demo.</p>
+              <button className="auth-demo-button" type="button" onClick={enterDemoMode}>
+                Masuk sebagai demo <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+          <p className="auth-footnote">Data demo tersimpan hanya di browser ini.</p>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -724,6 +944,10 @@ function App() {
             </span>
           </div>
           <div className="pill">Skor nutrisi</div>
+          <button className="topbar-signout" type="button" onClick={signOut} title={`Keluar dari ${displayName}`}>
+            <LogOut size={17} />
+            <span className="sr-only">Keluar dari akun</span>
+          </button>
         </div>
       </header>
 

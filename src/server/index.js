@@ -253,6 +253,19 @@ app.post('/api/meals/log', async (req, res) => {
   }
 
   const { foodId, mealType = 'Lunch', servings = 1 } = req.body || {};
+  const servingCount = Number(servings);
+  const supportedMealTypes = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Hydration'];
+
+  if (!foodId || typeof foodId !== 'string') {
+    return res.status(400).json({ message: 'A valid foodId is required' });
+  }
+  if (!supportedMealTypes.includes(mealType)) {
+    return res.status(400).json({ message: 'Invalid meal type' });
+  }
+  if (!Number.isFinite(servingCount) || servingCount <= 0 || servingCount > 999.99) {
+    return res.status(400).json({ message: 'Servings must be between 0 and 999.99' });
+  }
+
   const food = (await getMenuFromDb()).find((item) => item.id === foodId);
 
   if (!food) {
@@ -263,22 +276,27 @@ app.post('/api/meals/log', async (req, res) => {
     id: `meal-${Date.now()}`,
     name: food.name,
     mealType,
-    calories: Math.round(food.caloriesKcal * Number(servings || 1)),
-    protein: Math.round(food.proteinG * Number(servings || 1)),
+    calories: Math.round(food.caloriesKcal * servingCount),
+    protein: Math.round(food.proteinG * servingCount),
     loggedAt: new Date().toISOString(),
   };
 
   if (process.env.DATABASE_URL) {
     try {
-      const [ledgerEntry] = await prisma.$queryRaw`
-        SELECT meal_id, calories_kcal, protein_g, fiber_g
-        FROM log_meal_with_ledger(
-          ${session.user.id},
-          ${food.id},
-          ${mealType},
-          ${Number(servings || 1)}
-        )
-      `;
+      const ledgerEntry = await prisma.$transaction(async (transaction) => {
+        const [entry] = await transaction.$queryRaw`
+          SELECT meal_id, calories_kcal, protein_g, fiber_g
+          FROM log_meal_with_ledger(
+            ${session.user.id},
+            ${food.id},
+            ${mealType},
+            ${servingCount}
+          )
+        `;
+
+        if (!entry) throw new Error('Meal transaction returned no ledger entry');
+        return entry;
+      });
 
       if (ledgerEntry) {
         result.id = ledgerEntry.meal_id;
@@ -286,7 +304,8 @@ app.post('/api/meals/log', async (req, res) => {
         result.protein = Math.round(Number(ledgerEntry.protein_g));
       }
     } catch (error) {
-      console.warn('Meal logging DB fallback activated:', error.message);
+      console.error('Meal logging transaction rolled back:', error.message);
+      return res.status(500).json({ message: 'Meal could not be saved. No changes were committed.' });
     }
   }
 

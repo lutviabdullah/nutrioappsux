@@ -368,6 +368,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
+  v_locked_user_id TEXT;
   v_food_id TEXT;
   v_meal_id TEXT;
   v_ledger_id UUID := gen_random_uuid();
@@ -382,7 +383,11 @@ BEGIN
   END IF;
 
   PERFORM set_config('app.user_id', p_user_id, true);
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_user_id, 0));
+
+  SELECT id INTO STRICT v_locked_user_id
+  FROM users
+  WHERE id = p_user_id
+  FOR UPDATE;
 
   SELECT id INTO STRICT v_food_id
   FROM food_items

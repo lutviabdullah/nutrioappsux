@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Assumed model:
+    // profiles/{uid}: full_name (string, required, 1-120 chars), university
+    // and faculty (strings, required, 0-160 chars), semester (null or integer
+    // 1-20). This document is private to its owner.
+    // education/{id}: title (string, <=120 chars), summary (string, <=2000),
+    // action (string, <=1000), icon (string, <=40), sort_order (integer), and
+    // is_published (boolean). Signed-in users read published documents only;
+    // shared content is written by trusted tooling, never by app clients.
+    // food_catalog/{id}: name (string, <=150 chars), subtitle/description
+    // (optional strings, <=255/2000), emoji (optional string, <=20),
+    // category_name (string, <=80), base_price (non-negative number),
+    // nutrition_score and eco_score (integers, 0-100), recommendation
+    // (string, <=2000), and optional nutrition/rating numbers. Signed-in users
+    // may read this non-personal catalog; app clients cannot write it.
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidProfile(data) {
+      return data.keys().hasAll(['full_name', 'university', 'faculty', 'semester'])
+        && data.keys().hasOnly(['full_name', 'university', 'faculty', 'semester'])
+        && data.full_name is string
+        && data.full_name.size() > 0
+        && data.full_name.size() <= 120
+        && data.university is string
+        && data.university.size() <= 160
+        && data.faculty is string
+        && data.faculty.size() <= 160
+        && (data.semester == null || (data.semester is int && data.semester >= 1 && data.semester <= 20));
+    }
+
+    match /profiles/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidProfile(request.resource.data);
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && isValidProfile(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /education/{educationId} {
+      allow read: if isSignedIn() && resource.data.is_published == true;
+      allow write: if false;
+    }
+
+    match /food_catalog/{foodId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

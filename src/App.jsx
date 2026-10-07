@@ -27,7 +27,23 @@ import {
   User,
   UtensilsCrossed,
 } from 'lucide-react';
-import { supabase } from './supabaseClient';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updateProfile,
+} from 'firebase/auth';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  where,
+} from 'firebase/firestore';
+import { auth, db } from './firebaseClient';
 import './styles.css';
 
 const indonesianMenuCatalog = [
@@ -358,10 +374,10 @@ const defaultProfile = {
   semester: 6,
 };
 
-function mapEducationRow(row) {
+function mapEducationRow(id, row) {
   return {
-    id: row.id,
-    sortOrder: row.sort_order,
+    id,
+    sortOrder: row.sort_order || 0,
     title: row.title,
     icon: educationIcons[row.icon] || BookOpen,
     text: row.summary,
@@ -467,7 +483,7 @@ const initialProfileHabits = [
 
 function App() {
   const [activePage, setActivePage] = useState('home');
-  const [authSession, setAuthSession] = useState(null);
+  const [authUser, setAuthUser] = useState(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authMode, setAuthMode] = useState('login');
   const [authEmail, setAuthEmail] = useState('');
@@ -476,13 +492,6 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [demoUser, setDemoUser] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('nutrio-demo-session') || 'null');
-    } catch {
-      return null;
-    }
-  });
   const [selectedMenu, setSelectedMenu] = useState(menuOptions[0].id);
   const [activeInsight, setActiveInsight] = useState('nutrition');
   const [selectedPeriod, setSelectedPeriod] = useState('minggu');
@@ -491,8 +500,8 @@ function App() {
   const [profile, setProfile] = useState(defaultProfile);
   const [profileDraft, setProfileDraft] = useState(defaultProfile);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [supabaseStatus, setSupabaseStatus] = useState('connecting');
-  const [supabaseUserId, setSupabaseUserId] = useState(null);
+  const [profileSaveError, setProfileSaveError] = useState('');
+  const [firebaseStatus, setFirebaseStatus] = useState('connecting');
   const [catalogRows, setCatalogRows] = useState(indonesianMenuCatalog);
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogRefreshToken, setCatalogRefreshToken] = useState(0);
@@ -500,144 +509,78 @@ function App() {
   const [catalogLoading, setCatalogLoading] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const savedProfile = localStorage.getItem('nutrio-profile');
-    if (savedProfile) {
-      try {
-        const parsedProfile = { ...defaultProfile, ...JSON.parse(savedProfile) };
-        setProfile(parsedProfile);
-        setProfileDraft(parsedProfile);
-      } catch {
-        localStorage.removeItem('nutrio-profile');
-      }
-    }
-
-    if (!supabase) {
-      setSupabaseStatus('setup');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setFirebaseStatus('live');
       setIsAuthReady(true);
-      return () => {};
-    }
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!cancelled) {
-        setAuthSession(session);
-        setIsAuthReady(true);
-      }
+    }, (error) => {
+      console.warn('Firebase auth state unavailable:', error.message);
+      setFirebaseStatus('offline');
+      setIsAuthReady(true);
     });
 
-    supabase.auth.getSession()
-      .then(({ data, error }) => {
-        if (error) throw error;
-        if (!cancelled) setAuthSession(data.session);
-      })
-      .catch((error) => {
-        console.warn('Supabase session restore failed:', error.message);
-        if (!cancelled) setSupabaseStatus('offline');
-      })
-      .finally(() => {
-        if (!cancelled) setIsAuthReady(true);
-      });
-
-    return () => {
-      cancelled = true;
-      authListener.subscription.unsubscribe();
-    };
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
-    if (!supabase || !authSession) {
-      setSupabaseUserId(null);
-      return () => {};
+    if (!authUser) {
+      setProfile(defaultProfile);
+      setProfileDraft(defaultProfile);
+      return undefined;
     }
 
-    let cancelled = false;
-    const userId = authSession.user.id;
-    setSupabaseUserId(userId);
+    const profileRef = doc(db, 'profiles', authUser.uid);
+    const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
+      const remoteProfile = snapshot.exists()
+        ? snapshot.data()
+        : { ...defaultProfile, full_name: authUser.displayName || defaultProfile.full_name };
+      const nextProfile = { ...defaultProfile, ...remoteProfile };
+      setProfile(nextProfile);
+      if (!isEditingProfile) setProfileDraft(nextProfile);
+      setFirebaseStatus('live');
+    }, (error) => {
+      console.warn('Firebase profile sync unavailable:', error.message);
+      setFirebaseStatus('offline');
+    });
 
-    const channel = supabase
-      .channel(`nutrio-live-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'education' }, (payload) => {
-        setEducationContent((current) => {
-          const changedRow = payload.eventType === 'DELETE' ? payload.old : payload.new;
-          const rows = current.filter((topic) => topic.id !== changedRow.id);
-          if (payload.eventType !== 'DELETE' && payload.new.is_published) {
-            rows.push(mapEducationRow(payload.new));
-          }
-          return rows.sort((first, second) => (first.sortOrder || 0) - (second.sortOrder || 0));
-        });
-      })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'profiles',
-        filter: `user_id=eq.${userId}`,
-      }, (payload) => {
-        if (payload.eventType !== 'DELETE' && payload.new) {
-          setProfile((current) => ({ ...current, ...payload.new }));
-        }
-      })
-      .subscribe((status) => {
-        if (!cancelled) setSupabaseStatus(status === 'SUBSCRIBED' ? 'live' : 'offline');
-      });
+    const educationQuery = query(
+      collection(db, 'education'),
+      where('is_published', '==', true),
+      orderBy('sort_order')
+    );
+    const unsubscribeEducation = onSnapshot(educationQuery, (snapshot) => {
+      const rows = snapshot.docs.map((educationDoc) => mapEducationRow(educationDoc.id, educationDoc.data()));
+      if (rows.length) setEducationContent(rows);
+      setFirebaseStatus('live');
+    }, (error) => {
+      console.warn('Firebase education sync unavailable:', error.message);
+      setFirebaseStatus('offline');
+    });
 
-    const loadUserData = async () => {
-      try {
-        const [profileResult, educationResult] = await Promise.all([
-          supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
-          supabase.from('education').select('*').eq('is_published', true).order('sort_order'),
-        ]);
-
-        if (profileResult.error || educationResult.error) throw profileResult.error || educationResult.error;
-        if (cancelled) return;
-        if (profileResult.data) {
-          setProfile((current) => ({ ...current, ...profileResult.data }));
-          setProfileDraft((current) => ({ ...current, ...profileResult.data }));
-        }
-        if (educationResult.data?.length) {
-          setEducationContent(educationResult.data.map(mapEducationRow));
-        }
-      } catch (error) {
-        console.warn('Supabase profile/education sync unavailable:', error.message);
-        if (!cancelled) setSupabaseStatus('offline');
-      }
-    };
-
-    loadUserData();
     return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
+      unsubscribeProfile();
+      unsubscribeEducation();
     };
-  }, [authSession]);
+  }, [authUser, isEditingProfile]);
 
   useEffect(() => {
     if (activePage !== 'catalog') return undefined;
 
-    let cancelled = false;
-    const loadCatalog = async () => {
-      if (!supabase) {
+    setCatalogLoading(true);
+    const catalogQuery = query(collection(db, 'food_catalog'), orderBy('nutrition_score', 'desc'));
+    return onSnapshot(catalogQuery, (snapshot) => {
+      if (snapshot.empty) {
         setCatalogRows(indonesianMenuCatalog);
-        setCatalogStatus('local');
-        return;
-      }
-
-      setCatalogLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('v_food_catalog')
-          .select('*')
-          .order('nutrition_score', { ascending: false });
-
-        if (error) throw error;
-        if (cancelled) return;
-
-        if (data?.length) {
-          setCatalogRows(data.map((row) => ({
-            id: row.food_id,
+        setCatalogStatus('empty');
+      } else {
+        setCatalogRows(snapshot.docs.map((catalogDoc) => {
+          const row = catalogDoc.data();
+          return {
+            id: catalogDoc.id,
             name: row.name,
             subtitle: row.subtitle || row.description || '',
             emoji: row.emoji,
-            category: row.category_name || 'Menu',
+            category: row.category_name || row.category || 'Menu',
             basePrice: Number(row.base_price || 0),
             nutritionScore: Number(row.nutrition_score || 0),
             ecoScore: Number(row.eco_score || 0),
@@ -647,27 +590,17 @@ function App() {
             fiberG: row.fiber_g == null ? null : Number(row.fiber_g),
             reviewCount: Number(row.review_count || 0),
             averageRating: row.average_rating == null ? null : Number(row.average_rating),
-          })));
-          setCatalogStatus('supabase');
-        } else {
-          setCatalogRows(indonesianMenuCatalog);
-          setCatalogStatus('empty');
-        }
-      } catch (error) {
-        console.warn('Catalog view unavailable:', error.message);
-        if (!cancelled) {
-          setCatalogRows(indonesianMenuCatalog);
-          setCatalogStatus('fallback');
-        }
-      } finally {
-        if (!cancelled) setCatalogLoading(false);
+          };
+        }));
+        setCatalogStatus('firestore');
       }
-    };
-
-    loadCatalog();
-    return () => {
-      cancelled = true;
-    };
+      setCatalogLoading(false);
+    }, (error) => {
+      console.warn('Firestore catalog unavailable:', error.message);
+      setCatalogRows(indonesianMenuCatalog);
+      setCatalogStatus('fallback');
+      setCatalogLoading(false);
+    });
   }, [activePage, catalogRefreshToken]);
 
   const selected = useMemo(
@@ -731,65 +664,53 @@ function App() {
     event.preventDefault();
     setAuthError('');
     setAuthMessage('');
-
-    if (!supabase) {
-      setAuthError('Login online belum tersedia. Gunakan mode demo atau atur kredensial Supabase.');
-      return;
-    }
-
     setIsAuthenticating(true);
     try {
       if (authMode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({
-          email: authEmail.trim(),
-          password: authPassword,
-          options: { data: { full_name: authName.trim() } },
+        const credential = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
+        const newProfile = {
+          ...defaultProfile,
+          full_name: authName.trim(),
+        };
+        setProfile(newProfile);
+        setProfileDraft(newProfile);
+        await updateProfile(credential.user, { displayName: authName.trim() });
+        await setDoc(doc(db, 'profiles', credential.user.uid), {
+          full_name: authName.trim(),
+          university: '',
+          faculty: '',
+          semester: null,
         });
-        if (error) throw error;
-        if (!data.session) {
-          setAuthMessage('Akun berhasil dibuat. Periksa email untuk menyelesaikan verifikasi.');
-        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: authEmail.trim(),
-          password: authPassword,
-        });
-        if (error) throw error;
+        await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
       }
     } catch (error) {
-      setAuthError(error.message || 'Autentikasi gagal. Silakan coba lagi.');
+      if (authMode === 'signup' && auth.currentUser) {
+        setProfileSaveError('Akun berhasil dibuat, tetapi profil belum tersimpan. Edit dan simpan profil untuk mencoba lagi.');
+        setActivePage('profile');
+      } else {
+        setAuthError(error.message || 'Autentikasi gagal. Silakan coba lagi.');
+      }
     } finally {
       setIsAuthenticating(false);
     }
   };
 
-  const enterDemoMode = () => {
-    const nextUser = { name: 'Alya Pradana', email: 'alya@nutrio.app' };
-    localStorage.setItem('nutrio-demo-session', JSON.stringify(nextUser));
-    setDemoUser(nextUser);
-    setAuthError('');
-  };
-
   const signOut = async () => {
     setAuthError('');
-    if (supabase && authSession) {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        setAuthError(error.message || 'Tidak dapat keluar dari akun.');
-        return;
-      }
+    try {
+      await firebaseSignOut(auth);
+      setProfile(defaultProfile);
+      setProfileDraft(defaultProfile);
+      setProfileSaveError('');
+      setActivePage('home');
+    } catch (error) {
+      setAuthError(error.message || 'Tidak dapat keluar dari akun.');
     }
-    localStorage.removeItem('nutrio-demo-session');
-    localStorage.removeItem('nutrio-profile');
-    setProfile(defaultProfile);
-    setProfileDraft(defaultProfile);
-    setDemoUser(null);
-    setActivePage('home');
   };
 
-  const displayName = authSession?.user?.user_metadata?.full_name
-    || authSession?.user?.email?.split('@')[0]
-    || demoUser?.name
+  const displayName = authUser?.displayName
+    || authUser?.email?.split('@')[0]
     || 'Nutrio User';
 
   const saveProfile = async (event) => {
@@ -799,24 +720,29 @@ function App() {
       semester: profileDraft.semester ? Number(profileDraft.semester) : null,
     };
     setProfile(nextProfile);
-    localStorage.setItem('nutrio-profile', JSON.stringify(nextProfile));
     setIsEditingProfile(false);
+    setProfileSaveError('');
 
-    if (!supabase || !supabaseUserId) {
-      setSupabaseStatus(supabase ? 'offline' : 'setup');
+    if (!authUser) {
+      setProfileSaveError('Masuk kembali untuk menyimpan profil ke Firebase.');
       return;
     }
 
-    const { error } = await supabase.from('profiles').upsert({
-      user_id: supabaseUserId,
-      full_name: nextProfile.full_name,
-      university: nextProfile.university,
-      faculty: nextProfile.faculty,
-      semester: nextProfile.semester,
-    });
-    if (error) {
-      console.warn('Profile sync failed:', error.message);
-      setSupabaseStatus('offline');
+    try {
+      await setDoc(doc(db, 'profiles', authUser.uid), {
+        full_name: nextProfile.full_name,
+        university: nextProfile.university,
+        faculty: nextProfile.faculty,
+        semester: nextProfile.semester,
+      }, { merge: true });
+      if (authUser.displayName !== nextProfile.full_name) {
+        await updateProfile(authUser, { displayName: nextProfile.full_name });
+      }
+      setFirebaseStatus('live');
+    } catch (error) {
+      console.warn('Firebase profile sync failed:', error.message);
+      setFirebaseStatus('offline');
+      setProfileSaveError('Profil tidak dapat disimpan ke Firestore. Periksa koneksi dan aturan akses.');
     }
   };
 
@@ -829,7 +755,7 @@ function App() {
     );
   }
 
-  if (!authSession && !demoUser) {
+  if (!authUser) {
     return (
       <main className="auth-page">
         <section className="auth-panel" aria-labelledby="auth-title">
@@ -906,21 +832,13 @@ function App() {
             </label>
             {authError && <p className="auth-feedback error" role="alert">{authError}</p>}
             {authMessage && <p className="auth-feedback success" role="status">{authMessage}</p>}
-            <button className="auth-submit" type="submit" disabled={isAuthenticating || !supabase}>
+            <button className="auth-submit" type="submit" disabled={isAuthenticating}>
               {isAuthenticating ? 'Memproses...' : authMode === 'signup' ? 'Buat akun' : 'Masuk ke Nutrio'}
               <LogIn size={17} />
             </button>
           </form>
 
-          {!supabase && (
-            <div className="auth-demo">
-              <p>Supabase belum dikonfigurasi di environment ini. Coba aplikasi dengan akun demo.</p>
-              <button className="auth-demo-button" type="button" onClick={enterDemoMode}>
-                Masuk sebagai demo <ArrowRight size={16} />
-              </button>
-            </div>
-          )}
-          <p className="auth-footnote">Data demo tersimpan hanya di browser ini.</p>
+          <p className="auth-footnote">Akun dikelola dengan Firebase Authentication.</p>
         </section>
       </main>
     );
@@ -937,10 +855,10 @@ function App() {
           <div className="topbar-icon">
             <Leaf size={20} />
           </div>
-          <div className={`live-status ${supabaseStatus}`} aria-live="polite">
+          <div className={`live-status ${firebaseStatus}`} aria-live="polite">
             <CircleDot size={12} />
             <span className="sr-only">
-              {supabaseStatus === 'live' ? 'Supabase live' : supabaseStatus === 'setup' ? 'Mode lokal' : 'Supabase offline'}
+              {firebaseStatus === 'live' ? 'Firebase live' : 'Firebase offline'}
             </span>
           </div>
           <div className="pill">Skor nutrisi</div>
@@ -1094,12 +1012,12 @@ function App() {
             <p className="catalog-status" aria-live="polite">
               {catalogLoading
                 ? 'Memuat katalog…'
-                : catalogStatus === 'supabase'
-                  ? `${filteredCatalogRows.length} menu dari Supabase`
+                : catalogStatus === 'firestore'
+                  ? `${filteredCatalogRows.length} menu dari Firestore`
                   : catalogStatus === 'empty'
-                    ? 'Belum ada menu di Supabase; menampilkan katalog contoh.'
+                    ? 'Belum ada menu di Firestore; menampilkan katalog contoh.'
                     : catalogStatus === 'fallback'
-                      ? 'Supabase tidak tersedia; menampilkan katalog contoh.'
+                      ? 'Firestore tidak tersedia; menampilkan katalog contoh.'
                       : 'Katalog contoh lokal'}
             </p>
 
@@ -1272,6 +1190,8 @@ function App() {
                   </div>
                 </form>
               )}
+
+              {profileSaveError && <p className="auth-feedback error" role="alert">{profileSaveError}</p>}
 
               <div className="profile-summary">
                 <div>

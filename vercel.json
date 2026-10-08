@@ -1,5 +1,6 @@
 {
   "framework": "vite",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
+  "installCommand": "npm --prefix src ci",
+  "buildCommand": "npm --prefix src run build",
+  "outputDirectory": "src/dist"
 }

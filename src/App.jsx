@@ -667,27 +667,29 @@ function App() {
     setIsAuthenticating(true);
     try {
       if (authMode === 'signup') {
+        const fullName = authName.trim();
+        if (!fullName) {
+          setAuthError('Nama lengkap wajib diisi.');
+          return;
+        }
         const credential = await createUserWithEmailAndPassword(auth, authEmail.trim(), authPassword);
         const newProfile = {
-          ...defaultProfile,
-          full_name: authName.trim(),
-        };
-        setProfile(newProfile);
-        setProfileDraft(newProfile);
-        await updateProfile(credential.user, { displayName: authName.trim() });
-        await setDoc(doc(db, 'profiles', credential.user.uid), {
-          full_name: authName.trim(),
+          full_name: fullName,
           university: '',
           faculty: '',
           semester: null,
-        });
+        };
+        setProfile(newProfile);
+        setProfileDraft(newProfile);
+        await updateProfile(credential.user, { displayName: fullName });
+        await setDoc(doc(db, 'profiles', credential.user.uid), newProfile);
       } else {
         await signInWithEmailAndPassword(auth, authEmail.trim(), authPassword);
       }
     } catch (error) {
       if (authMode === 'signup' && auth.currentUser) {
         setProfileSaveError('Akun berhasil dibuat, tetapi profil belum tersimpan. Edit dan simpan profil untuk mencoba lagi.');
-        setActivePage('profile');
+        setActivePage('home');
       } else {
         setAuthError(error.message || 'Autentikasi gagal. Silakan coba lagi.');
       }
@@ -876,7 +878,7 @@ function App() {
               <div className="hero-copy">
                 <div className="eyebrow">
                   <Sparkles size={15} />
-                  <span>Pelacak kebiasaan ramah lingkungan</span>
+                  <span>Halo, {displayName}</span>
                 </div>
                 <h2>Pilih makan siangmu, lihat dampakmu pada bumi.</h2>
                 <p>

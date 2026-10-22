@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.firebase/
+.env*
+!env.example
+functions/node_modules/
+functions/.runtimeconfig.json
+.DS_Store

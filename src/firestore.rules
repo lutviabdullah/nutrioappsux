@@ -52,6 +52,87 @@ service cloud.firestore {
     match /food_catalog/{foodId} {
       allow read: if isSignedIn();
       allow write: if false;
+
+      match /ingredients/{ingredientId} {
+        allow read: if isSignedIn();
+        allow write: if false;
+      }
+    }
+
+    match /food_categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /ingredients/{ingredientId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /nutrition_menu_views/{foodId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /users/{userId} {
+      function isValidMealLog() {
+        let data = request.resource.data;
+        let foodPath = /databases/$(database)/documents/food_catalog/$(data.food_id);
+        let foodSnapshot = get(foodPath);
+        let food = foodSnapshot.data;
+        let unitPrice = food.keys().hasAny(['base_price_minor'])
+          ? food.base_price_minor
+          : food.base_price;
+        let calories = food.keys().hasAny(['calories_kcal']) ? food.calories_kcal : 0;
+        let protein = food.keys().hasAny(['protein_g']) ? food.protein_g : 0;
+        let fiber = food.keys().hasAny(['fiber_g']) ? food.fiber_g : 0;
+        let currency = food.keys().hasAny(['currency_code']) ? food.currency_code : 'IDR';
+
+        return isSignedIn()
+          && request.auth.uid == userId
+          && exists(foodPath)
+          && data.keys().hasAll([
+            'food_id', 'food_name', 'servings', 'calories_kcal', 'protein_g',
+            'fiber_g', 'unit_price_minor', 'amount_minor', 'currency_code',
+            'day_id', 'created_at'
+          ])
+          && data.keys().hasOnly([
+            'food_id', 'food_name', 'servings', 'calories_kcal', 'protein_g',
+            'fiber_g', 'unit_price_minor', 'amount_minor', 'currency_code',
+            'day_id', 'created_at'
+          ])
+          && data.food_id is string
+          && data.food_name == food.name
+          && data.servings is int
+          && data.servings >= 1
+          && data.servings <= 10
+          && unitPrice is number
+          && unitPrice >= 0
+          && data.unit_price_minor == unitPrice
+          && data.amount_minor == unitPrice * data.servings
+          && data.calories_kcal == calories * data.servings
+          && data.protein_g == protein * data.servings
+          && data.fiber_g == fiber * data.servings
+          && data.currency_code == currency
+          && data.day_id is string
+          && data.day_id.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && data.created_at == request.time;
+      }
+
+      match /meal_logs/{logId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow create: if isValidMealLog();
+        allow update, delete: if false;
+      }
+
+      match /nutrition_days/{dayId} {
+        allow read: if isSignedIn() && request.auth.uid == userId;
+        allow write: if false;
+      }
+
+      match /processed_meal_events/{eventId} {
+        allow read, write: if false;
+      }
     }
 
     match /{document=**} {

@@ -40,305 +40,61 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
+  serverTimestamp,
   setDoc,
   where,
 } from 'firebase/firestore';
 import { auth, db } from './firebaseClient';
+import { indonesianMenuCatalog } from './foodCatalog';
 import './styles.css';
 
-const indonesianMenuCatalog = [
-  {
-    id: 'nasi-goreng',
-    name: 'Nasi Goreng Kampung',
-    subtitle: 'Nasi, telur, sayur, bawang, rempah lokal',
-    emoji: '🍛',
-    category: 'Harian',
-    basePrice: 15000,
-    nutritionScore: 74,
-    ecoScore: 68,
-    recommendation: 'Menu klasik yang tetap cocok untuk kebutuhan energi harian, terutama saat ditambah sayuran berlimpah.',
-  },
-  {
-    id: 'gado-gado',
-    name: 'Gado-Gado Nusantara',
-    subtitle: 'Sayur segar, tahu, tempe, kacang, sambal',
-    emoji: '🥗',
-    category: 'Vegan',
-    basePrice: 12000,
-    nutritionScore: 91,
-    ecoScore: 89,
-    recommendation: 'Pilihan paling kuat untuk pola makan seimbang karena kaya serat, protein nabati, dan kandungan sayur.',
-  },
-  {
-    id: 'soto-ayam',
-    name: 'Soto Ayam Sehat',
-    subtitle: 'Kaldu ringan, ayam fillet, wortel, daun seledri',
-    emoji: '🍲',
-    category: 'Tradisional',
-    basePrice: 16500,
-    nutritionScore: 72,
-    ecoScore: 71,
-    recommendation: 'Soto ini ringan dan cocok untuk kebutuhan protein harian jika disajikan dengan porsi sayur lebih besar.',
-  },
-  {
-    id: 'mie-ayam',
-    name: 'Mie Ayam Kampus',
-    subtitle: 'Mie, ayam potong kecil, sawi, pangsit',
-    emoji: '🍜',
-    category: 'Kantin',
-    basePrice: 17000,
-    nutritionScore: 68,
-    ecoScore: 62,
-    recommendation: 'Menu familiar dan praktis, tetapi lebih baik dibarengi dengan sayur segar untuk keseimbangan nutrisi.',
-  },
-  {
-    id: 'pecel',
-    name: 'Pecel Sayur',
-    subtitle: 'Lontong, sayur rebus, kacang, sambal',
-    emoji: '🥬',
-    category: 'Sehat',
-    basePrice: 14000,
-    nutritionScore: 85,
-    ecoScore: 80,
-    recommendation: 'Sangat cocok untuk menu siang yang ringan namun kaya serat dan anti lelah.',
-  },
-  {
-    id: 'rendang',
-    name: 'Rendang Padang',
-    subtitle: 'Daging sapi, santan, rempah khas',
-    emoji: '🥘',
-    category: 'Protein',
-    basePrice: 26000,
-    nutritionScore: 77,
-    ecoScore: 52,
-    recommendation: 'Lezat untuk momen spesial, namun sebaiknya dihadirkan dengan sayur agar keseimbangan lebih optimal.',
-  },
-  {
-    id: 'bakso',
-    name: 'Bakso Sehat',
-    subtitle: 'Bakso sapi, mie, sawi, kuah kaldu',
-    emoji: '🍜',
-    category: 'Kantin',
-    basePrice: 18000,
-    nutritionScore: 70,
-    ecoScore: 64,
-    recommendation: 'Cocok sebagai pemenuhan protein, dan pilih kuah yang lebih bening serta sayur lebih banyak.',
-  },
-  {
-    id: 'tempe-bowl',
-    name: 'Tempe Bowl',
-    subtitle: 'Nasi, tempe crispy, sambal hijau, lalapan',
-    emoji: '🥣',
-    category: 'Plant Based',
-    basePrice: 14000,
-    nutritionScore: 86,
-    ecoScore: 83,
-    recommendation: 'Pilihan ini sangat bagus untuk gaya hidup berkelanjutan dan pas untuk makan siang rutin.',
-  },
-  {
-    id: 'ayam-geprek',
-    name: 'Ayam Geprek Ceker',
-    subtitle: 'Ayam crispy, sambal, kol, timun',
-    emoji: '🍗',
-    category: 'Fast Food',
-    basePrice: 21000,
-    nutritionScore: 63,
-    ecoScore: 58,
-    recommendation: 'Rasa nikmat dan mengenyangkan, tapi lebih sehat bila dikombinasikan dengan sayur dan porsi wajar.',
-  },
-  {
-    id: 'rawon',
-    name: 'Rawon Suroboyo',
-    subtitle: 'Daging, kuah rempah hitam, daun bawang',
-    emoji: '🍲',
-    category: 'Tradisional',
-    basePrice: 22000,
-    nutritionScore: 75,
-    ecoScore: 59,
-    recommendation: 'Menu ini kaya rasa dan protein, tetapi sebaiknya dipadukan dengan tambahan sayur hijau.',
-  },
-  {
-    id: 'pempek',
-    name: 'Pempek Palembang',
-    subtitle: 'Ikan giling, mie, cuko, sayur mentimun',
-    emoji: '🐟',
-    category: 'Seafood',
-    basePrice: 19000,
-    nutritionScore: 79,
-    ecoScore: 73,
-    recommendation: 'Sumber protein yang baik untuk variasi harian jika dikonsumsi dengan porsi yang seimbang.',
-  },
-  {
-    id: 'lontong-sayur',
-    name: 'Lontong Sayur',
-    subtitle: 'Lontong, sayur santan, tahu, tempe',
-    emoji: '🥥',
-    category: 'Tradisional',
-    basePrice: 13000,
-    nutritionScore: 82,
-    ecoScore: 81,
-    recommendation: 'Menu ini sangat ramah kantong dan juga kaya serat, terutama saat sayuran hadir lebih dominan.',
-  },
-  {
-    id: 'sate-ayam',
-    name: 'Sate Ayam Madura',
-    subtitle: 'Ayam, lontong, bumbu kacang, timun',
-    emoji: '🍢',
-    category: 'Protein',
-    basePrice: 20000,
-    nutritionScore: 81,
-    ecoScore: 69,
-    recommendation: 'Sate bisa menjadi pilihan tinggi protein, namun lebih baik untuk takaran porsi yang moderat.',
-  },
-  {
-    id: 'es-teh',
-    name: 'Es Teh Segar',
-    subtitle: 'Teh, lemon, irisan mentimun, es batu',
-    emoji: '🧊',
-    category: 'Minuman',
-    basePrice: 7000,
-    nutritionScore: 55,
-    ecoScore: 88,
-    recommendation: 'Minuman segar yang cocok untuk menjaga hidrasi, terutama ketika tidak terlalu manis.',
-  },
-  {
-    id: 'rujak',
-    name: 'Rujak Buah',
-    subtitle: 'Buah segar, kacang, bumbu petis',
-    emoji: '🍇',
-    category: 'Buah',
-    basePrice: 12000,
-    nutritionScore: 83,
-    ecoScore: 87,
-    recommendation: 'Pilihan yang sangat baik untuk serat dan vitamin sekaligus tetap menyegarkan saat siang hari.',
-  },
-  {
-    id: 'tumis-kangkung',
-    name: 'Tumis Kangkung',
-    subtitle: 'Kangkung, bawang putih, cabai, sedikit minyak',
-    emoji: '🥬',
-    category: 'Sayur',
-    basePrice: 11000,
-    nutritionScore: 88,
-    ecoScore: 92,
-    recommendation: 'Sangat cocok sebagai pendamping menu utama untuk meningkatkan asupan sayur dan menurunkan jejak karbon.',
-  },
-  {
-    id: 'mie-rebus',
-    name: 'Mie Rebus Betawi',
-    subtitle: 'Mie, sayur, telur, kuah rempah',
-    emoji: '🍜',
-    category: 'Tradisional',
-    basePrice: 16000,
-    nutritionScore: 76,
-    ecoScore: 70,
-    recommendation: 'Menu ini tepat untuk kebutuhan kenyang tanpa overload kalori bila porsi sayur ditambah.',
-  },
-  {
-    id: 'ikan-bakar',
-    name: 'Ikan Bakar Segar',
-    subtitle: 'Ikan nila, sambal, kemangi, jeruk nipis',
-    emoji: '🐠',
-    category: 'Seafood',
-    basePrice: 24000,
-    nutritionScore: 89,
-    ecoScore: 76,
-    recommendation: 'Pilihan sehat, kaya protein, dan sangat cocok untuk pola makan sehat yang tetap lezat.',
-  },
-  {
-    id: 'nasi-padang',
-    name: 'Nasi Padang',
-    subtitle: 'Nasi, rendang, sayur, sambal hijau',
-    emoji: '🍚',
-    category: 'Combo',
-    basePrice: 24000,
-    nutritionScore: 80,
-    ecoScore: 65,
-    recommendation: 'Menu lengkap dan kaya rasa, tetapi pilih porsi sayur dan protein nabati untuk keseimbangan lebih baik.',
-  },
-  {
-    id: 'sayur-asem',
-    name: 'Sayur Asem Komplit',
-    subtitle: 'Asem jawa, sayur, tahu, tempe, daun melinjo',
-    emoji: '🥦',
-    category: 'Sayur',
-    basePrice: 13000,
-    nutritionScore: 87,
-    ecoScore: 90,
-    recommendation: 'Menu yang sangat baik untuk asupan serat dan rasa segar tanpa perlu banyak tambahan lemak.',
-  },
-  {
-    id: 'capcay',
-    name: 'Capcay Organik',
-    subtitle: 'Sayur, jamur, wortel, brokoli, udang',
-    emoji: '🥦',
-    category: 'Hidangan',
-    basePrice: 19000,
-    nutritionScore: 87,
-    ecoScore: 82,
-    recommendation: 'Menu ini memadukan berbagai jenis sayur dan protein ringan untuk kebutuhan harian yang seimbang.',
-  },
-];
-
-const menuVariants = ['Classic', 'Campus', 'Sehat', 'Protein', 'Bumi', 'Rasa Lokal', 'Hemat', 'Green', 'Family', 'Chef Pick'];
-
-const menuOptions = indonesianMenuCatalog.flatMap((base, menuIndex) =>
-  Array.from({ length: 10 }, (_, variantIndex) => {
-    const nutrientBoost = (variantIndex % 3) * 3 + (menuIndex % 2 === 0 ? 1 : 0);
-    const ecoBoost = (variantIndex + menuIndex) % 4 === 0 ? 3 : (variantIndex % 2 === 0 ? 2 : 1);
-    const variantName = menuVariants[variantIndex];
-    const packageNames = [
-      'Porsi Ringan',
-      'Porsi Standar',
-      'Porsi Protein',
-      'Porsi Hijau',
-      'Porsi Hemat',
-      'Porsi Keluarga',
-      'Porsi Energi',
-      'Porsi Rendah Garam',
-      'Porsi Seimbang',
-      'Porsi Lokal',
-    ];
-
+function buildMenuOptions(rows) {
+  return rows.map((row) => {
+    const nutritionScore = Number(row.nutritionScore || 0);
+    const ecoScore = Number(row.ecoScore || 0);
     return {
-      ...base,
-      id: `${base.id}-${variantIndex + 1}`,
-      name: `${base.name} ${variantName}`,
-      subtitle: `${base.subtitle} • ${packageNames[variantIndex]}`,
-      price: base.basePrice + variantIndex * 1800 + (menuIndex % 5) * 700,
-      nutritionScore: Math.min(98, base.nutritionScore + nutrientBoost),
-      ecoScore: Math.min(96, base.ecoScore + ecoBoost),
-      recommendation: `${base.recommendation} Versi ${variantName} sangat sesuai dipakai untuk pola makan modern yang tetap peduli pada lingkungan.`,
+      ...row,
+      basePriceMinor: Number(row.basePriceMinor ?? row.basePrice ?? 0),
+      currencyCode: row.currencyCode || 'IDR',
+      priceYear: Number(row.priceYear || 2026),
+      nutritionScore,
+      ecoScore,
+      ecoLabel: ecoScore >= 80 ? 'Rendah karbon' : ecoScore >= 65 ? 'Sedang' : 'Tinggi karbon',
+      tone: ecoScore >= 80 ? 'low' : ecoScore >= 65 ? 'medium' : 'high',
+      servingLabel: '1 porsi standar',
     };
-  })
-);
+  });
+}
 
-const carbonMenuGroups = [
-  {
-    key: 'low',
-    title: 'Jejak karbon rendah',
-    description: 'Pilihan paling ramah lingkungan',
-    range: 'Eco score 80+',
-    tone: 'low',
-    items: menuOptions.filter((menu) => menu.ecoScore >= 80),
-  },
-  {
-    key: 'medium',
-    title: 'Jejak karbon sedang',
-    description: 'Pilihan seimbang untuk sehari-hari',
-    range: 'Eco score 65–79',
-    tone: 'medium',
-    items: menuOptions.filter((menu) => menu.ecoScore >= 65 && menu.ecoScore < 80),
-  },
-  {
-    key: 'high',
-    title: 'Jejak karbon tinggi',
-    description: 'Nikmati lebih jarang dan imbangi dengan menu hijau',
-    range: 'Eco score di bawah 65',
-    tone: 'high',
-    items: menuOptions.filter((menu) => menu.ecoScore < 65),
-  },
-];
+function buildCarbonMenuGroups(menus) {
+  return [
+    {
+      key: 'low',
+      title: 'Jejak karbon rendah',
+      description: 'Pilihan paling ramah lingkungan',
+      range: 'Eco score 80+',
+      tone: 'low',
+      items: menus.filter((menu) => menu.ecoScore >= 80),
+    },
+    {
+      key: 'medium',
+      title: 'Jejak karbon sedang',
+      description: 'Pilihan seimbang untuk sehari-hari',
+      range: 'Eco score 65–79',
+      tone: 'medium',
+      items: menus.filter((menu) => menu.ecoScore >= 65 && menu.ecoScore < 80),
+    },
+    {
+      key: 'high',
+      title: 'Jejak karbon tinggi',
+      description: 'Nikmati lebih jarang dan imbangi dengan menu hijau',
+      range: 'Eco score di bawah 65',
+      tone: 'high',
+      items: menus.filter((menu) => menu.ecoScore < 65),
+    },
+  ];
+}
 
 const educationTopics = [
   {
@@ -383,6 +139,41 @@ function mapEducationRow(id, row) {
     text: row.summary,
     action: row.action,
   };
+}
+
+function mapCatalogRow(id, row) {
+  return {
+    id,
+    name: row.name,
+    subtitle: row.subtitle || row.description || '',
+    emoji: row.emoji,
+    category: row.category_name || row.category || 'Menu',
+    basePriceMinor: Number(row.base_price_minor ?? row.base_price ?? 0),
+    currencyCode: row.currency_code || 'IDR',
+    priceYear: Number(row.price_year || 2026),
+    servingLabel: row.serving_label || '1 porsi standar',
+    nutritionScore: Number(row.nutrition_score || 0),
+    ecoScore: Number(row.eco_score || 0),
+    recommendation: row.recommendation || '',
+    caloriesKcal: row.calories_kcal == null ? null : Number(row.calories_kcal),
+    proteinG: row.protein_g == null ? null : Number(row.protein_g),
+    fiberG: row.fiber_g == null ? null : Number(row.fiber_g),
+    reviewCount: Number(row.review_count || 0),
+    averageRating: row.average_rating == null ? null : Number(row.average_rating),
+  };
+}
+
+function formatCurrency(amountMinor, currencyCode = 'IDR') {
+  const safeCode = /^[A-Z]{3}$/.test(currencyCode) ? currencyCode : 'IDR';
+  const fractionDigits = new Intl.NumberFormat('en', {
+    style: 'currency',
+    currency: safeCode,
+  }).resolvedOptions().maximumFractionDigits;
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: safeCode,
+    maximumFractionDigits: fractionDigits,
+  }).format(Number(amountMinor || 0) / (10 ** fractionDigits));
 }
 
 const balancedIngredients = [
@@ -492,7 +283,7 @@ function App() {
   const [authError, setAuthError] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [selectedMenu, setSelectedMenu] = useState(menuOptions[0].id);
+  const [selectedMenu, setSelectedMenu] = useState(indonesianMenuCatalog[0].id);
   const [activeInsight, setActiveInsight] = useState('nutrition');
   const [selectedPeriod, setSelectedPeriod] = useState('minggu');
   const [profileHabits, setProfileHabits] = useState(initialProfileHabits);
@@ -507,6 +298,9 @@ function App() {
   const [catalogRefreshToken, setCatalogRefreshToken] = useState(0);
   const [catalogStatus, setCatalogStatus] = useState('local');
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [nutritionSummary, setNutritionSummary] = useState(null);
+  const [recordingFoodId, setRecordingFoodId] = useState('');
+  const [mealLogMessage, setMealLogMessage] = useState('');
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -521,6 +315,35 @@ function App() {
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (!authUser) {
+      setNutritionSummary(null);
+      return undefined;
+    }
+
+    const dayId = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+    const dailyLogsQuery = query(
+      collection(db, 'users', authUser.uid, 'meal_logs'),
+      where('day_id', '==', dayId)
+    );
+    return onSnapshot(dailyLogsQuery, (snapshot) => {
+      const logs = snapshot.docs.map((mealDoc) => mealDoc.data());
+      const spendByCurrency = {};
+      logs.forEach((meal) => {
+        spendByCurrency[meal.currency_code] = (spendByCurrency[meal.currency_code] || 0) + meal.amount_minor;
+      });
+      setNutritionSummary({
+        meal_count: logs.reduce((count, meal) => count + meal.servings, 0),
+        calories_kcal: logs.reduce((total, meal) => total + meal.calories_kcal, 0),
+        protein_g: logs.reduce((total, meal) => total + meal.protein_g, 0),
+        fiber_g: logs.reduce((total, meal) => total + meal.fiber_g, 0),
+        spend_by_currency: spendByCurrency,
+      });
+    }, (error) => {
+      console.warn('Firebase nutrition summary unavailable:', error.message);
+    });
+  }, [authUser]);
 
   useEffect(() => {
     if (!authUser) {
@@ -564,35 +387,21 @@ function App() {
   }, [authUser, isEditingProfile]);
 
   useEffect(() => {
-    if (activePage !== 'catalog') return undefined;
+    if (!authUser) {
+      setCatalogRows(indonesianMenuCatalog);
+      setCatalogStatus('local');
+      return undefined;
+    }
 
     setCatalogLoading(true);
-    const catalogQuery = query(collection(db, 'food_catalog'), orderBy('nutrition_score', 'desc'));
-    return onSnapshot(catalogQuery, (snapshot) => {
+    const sourceQuery = query(collection(db, 'food_catalog'), orderBy('nutrition_score', 'desc'));
+    return onSnapshot(sourceQuery, { includeMetadataChanges: true }, (snapshot) => {
       if (snapshot.empty) {
         setCatalogRows(indonesianMenuCatalog);
         setCatalogStatus('empty');
       } else {
-        setCatalogRows(snapshot.docs.map((catalogDoc) => {
-          const row = catalogDoc.data();
-          return {
-            id: catalogDoc.id,
-            name: row.name,
-            subtitle: row.subtitle || row.description || '',
-            emoji: row.emoji,
-            category: row.category_name || row.category || 'Menu',
-            basePrice: Number(row.base_price || 0),
-            nutritionScore: Number(row.nutrition_score || 0),
-            ecoScore: Number(row.eco_score || 0),
-            recommendation: row.recommendation || '',
-            caloriesKcal: row.calories_kcal == null ? null : Number(row.calories_kcal),
-            proteinG: row.protein_g == null ? null : Number(row.protein_g),
-            fiberG: row.fiber_g == null ? null : Number(row.fiber_g),
-            reviewCount: Number(row.review_count || 0),
-            averageRating: row.average_rating == null ? null : Number(row.average_rating),
-          };
-        }));
-        setCatalogStatus('firestore');
+        setCatalogRows(snapshot.docs.map((catalogDoc) => mapCatalogRow(catalogDoc.id, catalogDoc.data())));
+        setCatalogStatus(snapshot.metadata.fromCache ? 'cached' : 'firestore');
       }
       setCatalogLoading(false);
     }, (error) => {
@@ -601,21 +410,25 @@ function App() {
       setCatalogStatus('fallback');
       setCatalogLoading(false);
     });
-  }, [activePage, catalogRefreshToken]);
+  }, [authUser, catalogRefreshToken]);
 
+  const menuOptions = useMemo(() => buildMenuOptions(catalogRows), [catalogRows]);
   const selected = useMemo(
-    () => menuOptions.find((item) => item.id === selectedMenu) ?? menuOptions[0],
-    [selectedMenu]
+    () => menuOptions.find((item) => item.id === selectedMenu) ?? menuOptions[0] ?? buildMenuOptions(indonesianMenuCatalog)[0],
+    [menuOptions, selectedMenu]
   );
-
-  const featured = menuOptions.slice(0, 3);
+  const featured = useMemo(
+    () => [...menuOptions].sort((first, second) => second.nutritionScore - first.nutritionScore).slice(0, 3),
+    [menuOptions]
+  );
+  const carbonMenuGroups = useMemo(() => buildCarbonMenuGroups(menuOptions), [menuOptions]);
   const filteredCatalogRows = useMemo(() => {
     const query = catalogQuery.trim().toLocaleLowerCase('id-ID');
-    if (!query) return catalogRows;
-    return catalogRows.filter((item) =>
+    if (!query) return menuOptions;
+    return menuOptions.filter((item) =>
       `${item.name} ${item.subtitle} ${item.category}`.toLocaleLowerCase('id-ID').includes(query)
     );
-  }, [catalogRows, catalogQuery]);
+  }, [menuOptions, catalogQuery]);
 
   const insightData = {
     nutrition: {
@@ -658,6 +471,59 @@ function App() {
         habit.id === habitId ? { ...habit, done: !habit.done } : habit
       )
     );
+  };
+
+  const recordMealEntry = async (item) => {
+    setMealLogMessage('');
+    setRecordingFoodId(item.id);
+    try {
+      const foodRef = doc(db, 'food_catalog', item.id);
+      const logRef = doc(collection(db, 'users', authUser.uid, 'meal_logs'));
+      const dayId = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+
+      await runTransaction(db, async (transaction) => {
+        const foodSnapshot = await transaction.get(foodRef);
+        if (!foodSnapshot.exists()) {
+          throw new Error('Menu tidak ditemukan di katalog Firestore. Muat ulang katalog dan coba lagi.');
+        }
+
+        const food = foodSnapshot.data();
+        const currencyCode = food.currency_code || 'IDR';
+        const unitPriceMinor = Number(food.base_price_minor ?? food.base_price);
+        const nutrition = {
+          caloriesKcal: Number(food.calories_kcal || 0),
+          proteinG: Number(food.protein_g || 0),
+          fiberG: Number(food.fiber_g || 0),
+        };
+        if (
+          !Number.isSafeInteger(unitPriceMinor) || unitPriceMinor < 0
+          || Object.values(nutrition).some((value) => !Number.isFinite(value) || value < 0)
+          || !/^[A-Z]{3}$/.test(currencyCode)
+        ) {
+          throw new Error('Harga atau data gizi menu belum valid di katalog Firestore.');
+        }
+
+        transaction.set(logRef, {
+          food_id: item.id,
+          food_name: String(food.name || 'Menu Nutrio').slice(0, 150),
+          servings: 1,
+          calories_kcal: nutrition.caloriesKcal,
+          protein_g: nutrition.proteinG,
+          fiber_g: nutrition.fiberG,
+          unit_price_minor: unitPriceMinor,
+          amount_minor: unitPriceMinor,
+          currency_code: currencyCode,
+          day_id: dayId,
+          created_at: serverTimestamp(),
+        });
+      });
+      setMealLogMessage(`${item.name} dicatat. Ringkasan dihitung langsung dari log Firestore akun Anda.`);
+    } catch (error) {
+      console.error('Firebase meal log failed:', error);
+      setMealLogMessage(error.message || 'Menu tidak dapat dicatat. Periksa koneksi dan aturan Firestore.');
+    } finally {
+      setRecordingFoodId('');
+    }
   };
 
   const handleAuthSubmit = async (event) => {
@@ -840,7 +706,7 @@ function App() {
             </button>
           </form>
 
-          <p className="auth-footnote">Akun dikelola dengan Firebase Authentication.</p>
+          <p className="auth-footnote">Firebase Authentication mengelola kredensial; profil Nutrio disimpan terpisah dengan UID akun.</p>
         </section>
       </main>
     );
@@ -954,7 +820,9 @@ function App() {
             <section className="panel">
               <div className="panel-heading">
                 <h3>Menu unggulan</h3>
-                <span>Terpopuler</span>
+              <button type="button" className="text-link" onClick={() => setActivePage('catalog')}>
+                Semua menu
+              </button>
               </div>
               <div className="featured-list">
                 {featured.map((menu) => (
@@ -969,7 +837,9 @@ function App() {
                   >
                     <div>
                       <span className="featured-name">{menu.name}</span>
-                      <span className="featured-meta">{menu.subtitle}</span>
+                      <span className="featured-meta">
+                        {menu.subtitle} · {formatCurrency(menu.basePriceMinor, menu.currencyCode)} / porsi · estimasi 2026
+                      </span>
                     </div>
                     <ArrowRight size={18} />
                   </button>
@@ -986,7 +856,7 @@ function App() {
                   <span>Menu database</span>
                 </div>
                 <h2>Menu &amp; gizi</h2>
-                <p>Data menu dan nutrisi dari katalog Nutrio.</p>
+                <p>Daftar kanonis untuk semua fitur · estimasi kantin per porsi standar, dapat berbeda menurut lokasi.</p>
               </div>
               <button
                 type="button"
@@ -1015,13 +885,39 @@ function App() {
               {catalogLoading
                 ? 'Memuat katalog…'
                 : catalogStatus === 'firestore'
-                  ? `${filteredCatalogRows.length} menu dari Firestore`
-                  : catalogStatus === 'empty'
-                    ? 'Belum ada menu di Firestore; menampilkan katalog contoh.'
-                    : catalogStatus === 'fallback'
-                      ? 'Firestore tidak tersedia; menampilkan katalog contoh.'
-                      : 'Katalog contoh lokal'}
+                  ? `${filteredCatalogRows.length} menu selaras dari Firestore · estimasi harga per porsi`
+                  : catalogStatus === 'cached'
+                    ? `${filteredCatalogRows.length} menu tersimpan di perangkat · mode offline`
+                    : catalogStatus === 'empty'
+                      ? 'Belum ada menu di Firestore; menampilkan estimasi katalog contoh tahun 2026.'
+                      : catalogStatus === 'fallback'
+                        ? 'Firestore tidak tersedia; menampilkan estimasi katalog contoh tahun 2026.'
+                        : 'Katalog contoh · estimasi tahun 2026'}
             </p>
+
+            {nutritionSummary && (
+              <section className="meal-summary-card" aria-live="polite">
+                <div>
+                  <span>Catatan makan hari ini</span>
+                  <strong>{nutritionSummary.meal_count || 0} menu</strong>
+                </div>
+                <div>
+                  <span>Energi</span>
+                  <strong>{Math.round(nutritionSummary.calories_kcal || 0)} kcal</strong>
+                </div>
+                <div>
+                  <span>Protein</span>
+                  <strong>{Number(nutritionSummary.protein_g || 0).toFixed(1)} g</strong>
+                </div>
+                {Object.entries(nutritionSummary.spend_by_currency || {}).map(([code, amount]) => (
+                  <div key={code}>
+                    <span>Estimasi belanja</span>
+                    <strong>{formatCurrency(amount, code)}</strong>
+                  </div>
+                ))}
+              </section>
+            )}
+            {mealLogMessage && <p className="meal-log-feedback" role="status">{mealLogMessage}</p>}
 
             {filteredCatalogRows.length ? (
               <section className="food-view-grid">
@@ -1033,7 +929,8 @@ function App() {
                     </div>
                     <h3>{item.name}</h3>
                     <p className="food-view-subtitle">{item.subtitle}</p>
-                    <div className="food-view-price">Rp{Number(item.basePrice || 0).toLocaleString('id-ID')}</div>
+                    <div className="food-view-price">{formatCurrency(item.basePriceMinor, item.currencyCode)}</div>
+                    <p className="food-view-serving">{item.servingLabel} · estimasi {item.priceYear}</p>
                     <div className="food-view-scores">
                       <span>Gizi <strong>{item.nutritionScore}%</strong></span>
                       <span>Bumi <strong>{item.ecoScore}%</strong></span>
@@ -1047,6 +944,16 @@ function App() {
                     )}
                     {item.averageRating != null && (
                       <p className="food-view-rating">Rating {item.averageRating} · {item.reviewCount} ulasan</p>
+                    )}
+                    {catalogStatus === 'firestore' && (
+                      <button
+                        className="meal-log-button"
+                        type="button"
+                        disabled={recordingFoodId === item.id}
+                        onClick={() => recordMealEntry(item)}
+                      >
+                        {recordingFoodId === item.id ? 'Mencatat…' : 'Catat menu'}
+                      </button>
                     )}
                   </article>
                 ))}
@@ -1088,6 +995,36 @@ function App() {
                   </article>
                 );
               })}
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading">
+                <h3>Menu pilihan untuk belajar gizi</h3>
+                <button type="button" className="text-link" onClick={() => setActivePage('catalog')}>
+                  Semua menu
+                </button>
+              </div>
+              <div className="featured-list">
+                {featured.map((menu) => (
+                  <button
+                    key={menu.id}
+                    className="featured-item"
+                    type="button"
+                    onClick={() => {
+                      setSelectedMenu(menu.id);
+                      setActivePage('ecocalc');
+                    }}
+                  >
+                    <div>
+                      <span className="featured-name">{menu.name}</span>
+                      <span className="featured-meta">
+                        Skor gizi {menu.nutritionScore}% · {formatCurrency(menu.basePriceMinor, menu.currencyCode)} / porsi · estimasi 2026
+                      </span>
+                    </div>
+                    <ArrowRight size={18} />
+                  </button>
+                ))}
+              </div>
             </section>
 
             <section className="panel">
@@ -1228,6 +1165,51 @@ function App() {
               </div>
             </section>
 
+            <section className="panel profile-menu-link">
+              <div>
+                <p className="eyebrow">Menu &amp; gizi</p>
+                <h3>{nutritionSummary ? `${nutritionSummary.meal_count || 0} menu tercatat hari ini` : 'Mulai catat menu harianmu'}</h3>
+                <p>
+                  {nutritionSummary
+                    ? `${Math.round(nutritionSummary.calories_kcal || 0)} kcal dan ${Number(nutritionSummary.protein_g || 0).toFixed(1)} g protein tercatat dari menu yang dipilih.`
+                    : `Lihat rekomendasi menu yang sama dengan NutriCalc. Harga ditampilkan per porsi standar, estimasi 2026.`}
+                </p>
+              </div>
+              <button type="button" className="secondary-btn small-btn" onClick={() => setActivePage('catalog')}>
+                Lihat menu
+              </button>
+            </section>
+
+            <section className="panel">
+              <div className="panel-heading">
+                <h3>Rekomendasi gizi dari katalog Nutrio</h3>
+                <button type="button" className="text-link" onClick={() => setActivePage('catalog')}>
+                  Semua menu
+                </button>
+              </div>
+              <div className="featured-list">
+                {featured.map((menu) => (
+                  <button
+                    key={menu.id}
+                    className="featured-item"
+                    type="button"
+                    onClick={() => {
+                      setSelectedMenu(menu.id);
+                      setActivePage('ecocalc');
+                    }}
+                  >
+                    <div>
+                      <span className="featured-name">{menu.name}</span>
+                      <span className="featured-meta">
+                        Gizi {menu.nutritionScore}% · {formatCurrency(menu.basePriceMinor, menu.currencyCode)} / porsi · estimasi {menu.priceYear}
+                      </span>
+                    </div>
+                    <ArrowRight size={18} />
+                  </button>
+                ))}
+              </div>
+            </section>
+
             <section className="insight-dashboard">
               <div className="insight-header">
                 <div>
@@ -1313,10 +1295,10 @@ function App() {
                 <div>
                   <div className="eyebrow">
                     <Calculator size={15} />
-                    <span>NutriCalc • 200 variasi menu</span>
+                    <span>NutriCalc • {menuOptions.length} menu dari katalog yang sama</span>
                   </div>
                   <h3>Pilih menu favoritmu</h3>
-                  <p>Setiap item menampilkan analisis eco-nutrisi secara cepat dan interaktif.</p>
+                  <p>Daftar, skor gizi, dan estimasi harga per porsi 2026 sama dengan halaman Menu &amp; gizi.</p>
                 </div>
                 <div className="mini-visual" aria-hidden="true">
                   <div className="mini-circle" />
@@ -1345,11 +1327,12 @@ function App() {
                         >
                           <div className="menu-card-top">
                             <span className="emoji">{menu.emoji}</span>
-                            <span className="menu-price">Rp{menu.price.toLocaleString('id-ID')}</span>
+                            <span className="menu-price">{formatCurrency(menu.basePriceMinor, menu.currencyCode)}</span>
                           </div>
                           <h4>{menu.name}</h4>
                           <p>{menu.subtitle}</p>
                           <div className="chip-row">
+                            <span className="chip">{menu.servingLabel}</span>
                             <span className="chip">{menu.category}</span>
                             <span className="chip">{menu.ecoLabel}</span>
                           </div>
@@ -1375,7 +1358,7 @@ function App() {
                   <p>{selected.subtitle}</p>
                   <div className="summary-meta">
                     <span>{selected.category}</span>
-                    <span>Rp{selected.price.toLocaleString('id-ID')}</span>
+                    <span>{formatCurrency(selected.basePriceMinor, selected.currencyCode)} / porsi standar</span>
                   </div>
                 </div>
                 <div className="score-ring">

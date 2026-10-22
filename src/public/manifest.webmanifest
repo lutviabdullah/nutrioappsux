@@ -1,0 +1,11 @@
+{
+  "name": "Nutrio — Menu & Gizi",
+  "short_name": "Nutrio",
+  "description": "Katalog menu kampus yang tetap dapat dibuka saat offline.",
+  "lang": "id",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4fbf7",
+  "theme_color": "#059669"
+}

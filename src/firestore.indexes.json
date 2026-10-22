@@ -7,6 +7,23 @@
         { "fieldPath": "is_published", "order": "ASCENDING" },
         { "fieldPath": "sort_order", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "nutrition_menu_views",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_published", "order": "ASCENDING" },
+        { "fieldPath": "nutrition_score", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "nutrition_menu_views",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "is_published", "order": "ASCENDING" },
+        { "fieldPath": "category_name", "order": "ASCENDING" },
+        { "fieldPath": "nutrition_score", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

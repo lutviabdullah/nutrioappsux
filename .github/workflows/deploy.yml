@@ -30,12 +30,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: src/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --prefix src
 
       - name: Build
-        run: VITE_BASE_PATH=/nutrioappsux/ npm run build
+        run: VITE_BASE_PATH=/nutrioappsux/ npm run build --prefix src
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -45,7 +46,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: './src/dist'
 
       - name: Deploy to GitHub Pages
         id: deployment

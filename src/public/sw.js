@@ -1,12 +1,14 @@
 const CACHE_NAME = 'nutrio-shell-v2';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest'];
+const APP_BASE_PATH = new URL('.', self.registration.scope).pathname;
+const APP_INDEX = `${APP_BASE_PATH}index.html`;
+const APP_SHELL = [APP_BASE_PATH, APP_INDEX, `${APP_BASE_PATH}manifest.webmanifest`];
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     await cache.addAll(APP_SHELL);
 
-    const response = await fetch('/index.html', { cache: 'reload' });
+    const response = await fetch(APP_INDEX, { cache: 'reload' });
     if (response.ok) {
       const html = await response.text();
       const assets = [...html.matchAll(/\b(?:src|href)="([^"]+)"/g)]
@@ -21,7 +23,7 @@ self.addEventListener('install', (event) => {
           console.warn('Unable to precache app asset:', url.pathname, error);
         }
       }));
-      await cache.put('/index.html', new Response(html, {
+      await cache.put(APP_INDEX, new Response(html, {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
       }));
     }
@@ -51,17 +53,20 @@ self.addEventListener('fetch', (event) => {
         const response = await fetch(request);
         if (response.ok) {
           const cache = await caches.open(CACHE_NAME);
-          await cache.put('/index.html', response.clone());
+          await cache.put(APP_INDEX, response.clone());
         }
         return response;
       } catch {
-        return (await caches.match('/index.html')) || Response.error();
+        return (await caches.match(APP_INDEX)) || Response.error();
       }
     })());
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || url.pathname === '/manifest.webmanifest') {
+  if (
+    url.pathname.startsWith(`${APP_BASE_PATH}assets/`)
+    || url.pathname === `${APP_BASE_PATH}manifest.webmanifest`
+  ) {
     event.respondWith((async () => {
       const cached = await caches.match(request, { ignoreVary: true });
       if (cached) return cached;
